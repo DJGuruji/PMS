@@ -4,6 +4,11 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
+  if (process.env.NODE_ENV === 'production') {
+    console.warn('Skipping seed: NODE_ENV is set to production.');
+    return;
+  }
+
   console.log('Seeding database...');
 
   // 1. Create Users
