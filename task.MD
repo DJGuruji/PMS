@@ -44,7 +44,7 @@ npm i prisma @prisma/client
 npx prisma init
 ```
 
-* [x] Setup ESLint, Prettier, Husky (commit hooks)
+* [x] Setup ESLint
 
 ---
 
