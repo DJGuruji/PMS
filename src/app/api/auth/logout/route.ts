@@ -16,7 +16,21 @@ export async function POST(req: Request) {
 
     const response = NextResponse.json({ message: 'Logged out successfully' });
 
-    response.cookies.delete('refreshToken');
+    response.cookies.set({
+      name: 'refreshToken',
+      value: '',
+      httpOnly: true,
+      expires: new Date(0),
+      path: '/',
+    });
+    
+    response.cookies.set({
+      name: 'accessToken',
+      value: '',
+      httpOnly: true,
+      expires: new Date(0),
+      path: '/',
+    });
 
     return response;
   } catch (error) {

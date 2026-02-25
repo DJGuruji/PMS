@@ -61,6 +61,15 @@ export async function POST(req: Request) {
       maxAge: 7 * 24 * 60 * 60,
     });
 
+    response.cookies.set({
+      name: 'accessToken',
+      value: newAccessToken,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 15 * 60,
+    });
+
     return response;
   } catch (error) {
     console.error('Refresh token error:', error);

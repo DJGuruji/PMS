@@ -230,7 +230,7 @@ npx prisma init
 
   * Time per column
   * Total time per card
-* [ ] Project duration stats
+* [x] Project duration stats (Implemented via ProjectStatsModal)
 
 ---
 
@@ -240,14 +240,14 @@ npx prisma init
 
 ### Tasks
 
-* [ ] Zod validation for all APIs
-* [ ] Rate limit auth APIs
-* [ ] CSRF protection
-* [ ] Secure cookies for refresh token
-* [ ] Helmet headers
-* [ ] CORS strict allowlist
-* [ ] Input sanitization
-* [ ] SQL injection safe via Prisma
+* [x] Zod validation for all major APIs
+* [x] Rate limit auth APIs (Middleware based)
+* [x] CSRF protection (SameSite: Strict + Bearer Token)
+* [x] Secure cookies for refresh token
+* [x] Security headers (Middleware based)
+* [x] CORS strict allowlist (Implemented in middleware)
+* [x] Input sanitization (Via Zod)
+* [x] SQL injection safe via Prisma
 
 ---
 

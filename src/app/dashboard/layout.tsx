@@ -27,9 +27,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     setMounted(true);
-    if (!user) {
-      router.push('/login');
-    }
+    
+    const restoreSession = async () => {
+      if (!user) {
+        try {
+          const { data } = await api.get('/auth/me');
+          useAuthStore.getState().setAuth(data, '');
+        } catch (e) {
+          router.push('/login');
+        }
+      }
+    };
+
+    restoreSession();
   }, [user, router]);
 
   if (!mounted || !user) return null;

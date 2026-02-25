@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Layout, Mail, Lock, Loader2, ArrowRight } from 'lucide-react';
@@ -14,6 +14,23 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const router = useRouter();
   const setAuth = useAuthStore((state) => state.setAuth);
+
+  useEffect(() => {
+    const checkUser = async () => {
+      if (!useAuthStore.getState().user) {
+        try {
+          const { data } = await api.get('/auth/me');
+          setAuth(data, '');
+          router.push('/dashboard');
+        } catch (e) {
+          // No session
+        }
+      } else {
+        router.push('/dashboard');
+      }
+    };
+    checkUser();
+  }, [setAuth, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
