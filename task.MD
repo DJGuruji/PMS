@@ -121,14 +121,14 @@ npx prisma init
 
 ### Tasks
 
-* [ ] User signup/login
-* [ ] Password hashing (bcrypt)
-* [ ] JWT access token (15 min expiry)
-* [ ] JWT refresh token (7 days)
-* [ ] Refresh token rotation
-* [ ] Store refresh tokens in DB (not localStorage)
-* [ ] Protect API routes with middleware
-* [ ] Role-based access (ADMIN, MEMBER)
+* [x] User signup/login
+* [x] Password hashing (bcrypt)
+* [x] JWT access token (15 min expiry)
+* [x] JWT refresh token (7 days)
+* [x] Refresh token rotation
+* [x] Store refresh tokens in DB (not localStorage)
+* [x] Protect API routes with middleware
+* [x] Role-based access (ADMIN, MEMBER)
 
 ---
 
@@ -138,18 +138,18 @@ npx prisma init
 
 ### Tasks
 
-* [ ] Admin can:
+* [x] Admin can:
 
   * Create project
   * Create columns per project
   * Create labels per project
   * Create priorities per project
   * Invite users
-* [ ] Member can:
+* [x] Member can:
 
   * View project
-  * Create/move cards
-* [ ] Enforce permissions in API layer (not frontend)
+  * Create/move cards (Implementation in progress via next steps)
+* [x] Enforce permissions in API layer (not frontend)
 
 ---
 
@@ -159,13 +159,13 @@ npx prisma init
 
 ### APIs
 
-* [ ] POST /api/projects
-* [ ] GET /api/projects
-* [ ] GET /api/projects/:id
-* [ ] POST /api/projects/:id/columns
-* [ ] POST /api/projects/:id/labels
-* [ ] POST /api/projects/:id/priorities
-* [ ] GET /api/projects/:id/board
+* [x] POST /api/projects
+* [x] GET /api/projects
+* [x] GET /api/projects/:id
+* [x] POST /api/projects/:id/columns
+* [x] POST /api/projects/:id/labels
+* [x] POST /api/projects/:id/priorities
+* [x] GET /api/projects/:id/board
 
 ---
 
