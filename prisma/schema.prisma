@@ -12,3 +12,182 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum CardStatus {
+  OPEN
+  CLOSED
+}
+
+model User {
+  id            String              @id @default(cuid())
+  email         String              @unique
+  password      String
+  name          String?
+  role          Role                @default(MEMBER)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  
+  projects      ProjectMembership[]
+  createdProjects Project[]         @relation("ProjectCreator")
+  assignedCards Card[]              @relation("CardAssignee")
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  movementLogs  CardMovementLog[]
+}
+
+model Project {
+  id          String              @id @default(cuid())
+  name        String
+  description String?
+  creatorId   String
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  creator     User                @relation("ProjectCreator", fields: [creatorId], references: [id])
+  members     ProjectMembership[]
+  columns     Column[]
+  labels      Label[]
+  priorities  Priority[]
+  cards       Card[]
+  auditLogs   AuditLog[]
+
+  @@index([creatorId])
+}
+
+model ProjectMembership {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String
+  role      Role     @default(MEMBER)
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([userId, projectId])
+  @@index([projectId])
+}
+
+model Column {
+  id        String   @id @default(cuid())
+  name      String
+  order     Int
+  projectId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  cards   Card[]
+
+  fromMovementLogs CardMovementLog[] @relation("FromColumn")
+  toMovementLogs   CardMovementLog[] @relation("ToColumn")
+
+  @@index([projectId])
+}
+
+model Card {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  status      CardStatus @default(OPEN)
+  order       Int        @default(0)
+  
+  assigneeId  String?
+  projectId   String
+  columnId    String
+  priorityId  String?
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  closedAt    DateTime?
+
+  assignee    User?      @relation("CardAssignee", fields: [assigneeId], references: [id])
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  column      Column     @relation(fields: [columnId], references: [id])
+  priority    Priority?  @relation(fields: [priorityId], references: [id])
+  labels      Label[]    @relation("CardLabels")
+  
+  movementLogs CardMovementLog[]
+
+  @@index([projectId])
+  @@index([columnId])
+  @@index([columnId, order])
+  @@index([assigneeId])
+}
+
+model Label {
+  id        String   @id @default(cuid())
+  name      String
+  color     String
+  projectId String
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  cards   Card[]  @relation("CardLabels")
+
+  @@index([projectId])
+}
+
+model Priority {
+  id        String   @id @default(cuid())
+  name      String
+  weight    Int
+  projectId String
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  cards   Card[]
+
+  @@index([projectId])
+}
+
+model CardMovementLog {
+  id           String   @id @default(cuid())
+  cardId       String
+  fromColumnId String?
+  toColumnId   String
+  movedById    String
+  movedAt      DateTime @default(now())
+
+  card       Card    @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  fromColumn Column? @relation("FromColumn", fields: [fromColumnId], references: [id])
+  toColumn   Column  @relation("ToColumn", fields: [toColumnId], references: [id])
+  movedBy    User    @relation(fields: [movedById], references: [id])
+
+  @@index([cardId])
+  @@index([movedAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String?
+  action    String
+  entity    String
+  entityId  String?
+  details   Json?
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@index([userId])
+  @@index([projectId])
+}

@@ -105,13 +105,13 @@ npx prisma init
 
 ### Tasks
 
-* [ ] Design Prisma schema
-* [ ] Add indexes on:
+* [x] Design Prisma schema
+* [x] Add indexes on:
 
   * card.projectId
   * card.columnId
   * card.assigneeId
-* [ ] Migrate DB
+* [x] Migrate DB
 
 ---
 
