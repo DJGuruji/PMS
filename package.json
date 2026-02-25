@@ -12,14 +12,21 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "@prisma/client": "^5.22.0",
+    "axios": "^1.13.5",
     "bcryptjs": "^3.0.3",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
     "jose": "^6.1.3",
     "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^0.575.0",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "zod": "^4.3.6"
+    "tailwind-merge": "^3.5.0",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
