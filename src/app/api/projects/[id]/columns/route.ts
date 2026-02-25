@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getUserId } from '@/lib/rbac';
-import { canManageProject } from '@/lib/project-rbac';
+import { canManageProject, getProjectRole } from '@/lib/project-rbac';
 import { z } from 'zod';
 
 const columnSchema = z.object({
@@ -49,12 +49,21 @@ export async function GET(
 ) {
   try {
     const projectId = params.id;
+    const userId = getUserId(req);
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const role = await getProjectRole(userId, projectId);
+    if (!role) {
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    }
+
     const columns = await prisma.column.findMany({
       where: { projectId },
       orderBy: { order: 'asc' },
     });
     return NextResponse.json(columns);
   } catch (error) {
+    console.error('Fetch columns error:', error);
     return NextResponse.json({ error: 'Fetch failed' }, { status: 500 });
   }
 }

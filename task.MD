@@ -248,6 +248,8 @@ npx prisma init
 * [x] CORS strict allowlist (Implemented in middleware)
 * [x] Input sanitization (Via Zod)
 * [x] SQL injection safe via Prisma
+* [x] Project-scoped RBAC enforcement
+* [x] Secure cookie parsing (via NextRequest.cookies)
 
 ---
 

@@ -1,13 +1,10 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { verifyRefreshToken, signAccessToken, signRefreshToken } from '@/lib/auth';
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const refreshToken = req.headers.get('cookie')
-      ?.split('; ')
-      .find(row => row.startsWith('refreshToken='))
-      ?.split('=')[1];
+    const refreshToken = req.cookies.get('refreshToken')?.value;
 
     if (!refreshToken) {
       return NextResponse.json({ error: 'Refresh token missing' }, { status: 401 });
