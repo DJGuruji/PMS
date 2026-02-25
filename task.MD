@@ -175,18 +175,18 @@ npx prisma init
 
 ### Tasks
 
-* [ ] Create card with:
+* [x] Create card with:
 
   * name
   * description
   * assignee
   * label
   * priority
-* [ ] Drag and drop between columns
-* [ ] On every move:
+* [x] Drag and drop between columns
+* [x] On every move:
 
   * Insert into CardMovementLog
-* [ ] Prevent invalid transitions (optional rules)
+* [x] Prevent invalid transitions (optional rules)
 
 ---
 
@@ -203,13 +203,13 @@ npx prisma init
 
 ### Tasks
 
-* [ ] API: GET /api/cards/:id/timeline
-* [ ] Compute:
+* [x] API: GET /api/cards/:id/timeline
+* [x] Compute:
 
   * Time spent in each column
   * Total lifecycle time
-* [ ] Project start time = first card created
-* [ ] Project end time = when all cards closed
+* [x] Project start time = first card created
+* [x] Project end time = when all cards closed
 
 ---
 
@@ -219,14 +219,14 @@ npx prisma init
 
 ### Tasks
 
-* [ ] Login / Register UI
-* [ ] Admin dashboard
-* [ ] Project list
-* [ ] Kanban board (drag & drop)
-* [ ] Card modal (edit details)
-* [ ] Column settings (admin)
-* [ ] Label & Priority dropdowns
-* [ ] Show:
+* [x] Login / Register UI
+* [x] Admin dashboard
+* [x] Project list
+* [x] Kanban board (drag & drop)
+* [x] Card modal (edit details + time/timeline)
+* [x] Column settings (admin) (Rename/Delete)
+* [x] Label & Priority support
+* [x] Environment-based Base URL
 
   * Time per column
   * Total time per card
@@ -257,11 +257,11 @@ npx prisma init
 
 ### Tasks
 
-* [ ] Index heavy query fields
-* [ ] Pagination for cards/projects
+* [x] Index heavy query fields
+* [x] Pagination for cards/projects
 * [ ] Caching (Redis optional)
-* [ ] Board API optimized query (single query)
-* [ ] Avoid N+1 Prisma queries
+* [x] Board API optimized query (single query)
+* [x] Avoid N+1 Prisma queries
 
 ---
 
@@ -271,14 +271,14 @@ npx prisma init
 
 ### Tasks
 
-* [ ] Log:
+* [x] Log:
 
   * Card moved
   * Card created
   * Project created
 * [ ] Error logging
 * [ ] Request tracing
-* [ ] Health endpoint `/health`
+* [x] Health endpoint `/health`
 
 ---
 

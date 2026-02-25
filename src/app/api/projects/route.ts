@@ -61,6 +61,18 @@ export async function POST(req: Request) {
         })),
       });
 
+      // Log project creation
+      await tx.auditLog.create({
+        data: {
+          userId,
+          projectId: newProject.id,
+          action: 'CREATE',
+          entity: 'PROJECT',
+          entityId: newProject.id,
+          details: { name: newProject.name }
+        }
+      });
+
       return newProject;
     });
 
@@ -81,36 +93,44 @@ export async function GET(req: Request) {
 
     const userRole = req.headers.get('x-user-role');
 
-    let projects;
+    const { searchParams } = new URL(req.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const skip = (page - 1) * limit;
 
-    if (userRole === Role.ADMIN) {
-      // Global Admins see everything
-      projects = await prisma.project.findMany({
-        orderBy: { createdAt: 'desc' },
-        include: {
-          _count: {
-            select: { members: true, cards: true }
-          }
+    let whereClause = {};
+    if (userRole !== Role.ADMIN) {
+      whereClause = {
+        members: {
+          some: { userId }
         }
-      });
-    } else {
-      // Members only see projects they belong to
-      projects = await prisma.project.findMany({
-        where: {
-          members: {
-            some: { userId }
-          }
-        },
-        orderBy: { createdAt: 'desc' },
-        include: {
-          _count: {
-            select: { members: true, cards: true }
-          }
-        }
-      });
+      };
     }
 
-    return NextResponse.json(projects);
+    const [projects, total] = await Promise.all([
+      prisma.project.findMany({
+        where: whereClause,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          _count: {
+            select: { members: true, cards: true }
+          }
+        },
+        skip,
+        take: limit,
+      }),
+      prisma.project.count({ where: whereClause })
+    ]);
+
+    return NextResponse.json({
+      projects,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
     console.error('Fetch projects error:', error);
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });

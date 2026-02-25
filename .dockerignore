@@ -1,0 +1,9 @@
+node_modules
+.next
+out
+.git
+.env
+Dockerfile
+docker-compose*
+README.md
+task.MD
