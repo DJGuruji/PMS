@@ -23,6 +23,18 @@ enum CardStatus {
   CLOSED
 }
 
+enum ProjectStatus {
+  IDLE
+  ACTIVE
+  PAUSED
+  CLOSED
+}
+
+enum CardMovementMode {
+  FREE
+  FORWARD_ONLY
+}
+
 model User {
   id            String              @id @default(cuid())
   email         String              @unique
@@ -41,12 +53,18 @@ model User {
 }
 
 model Project {
-  id          String              @id @default(cuid())
-  name        String
-  description String?
-  creatorId   String
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  id                String            @id @default(cuid())
+  name              String
+  description       String?
+  creatorId         String
+  status            ProjectStatus     @default(IDLE)
+  cardMovementMode  CardMovementMode  @default(FREE)
+  startedAt         DateTime?
+  pausedAt          DateTime?
+  closedAt          DateTime?
+  totalPausedMs     BigInt            @default(0)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   creator     User                @relation("ProjectCreator", fields: [creatorId], references: [id])
   members     ProjectMembership[]
@@ -67,7 +85,7 @@ model ProjectMembership {
   createdAt DateTime @default(now())
 
   user    User    @relation(fields: [userId], references: [id])
-  project Project @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([userId, projectId])
   @@index([projectId])
@@ -186,7 +204,7 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   user    User     @relation(fields: [userId], references: [id])
-  project Project? @relation(fields: [projectId], references: [id])
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([projectId])
