@@ -27,6 +27,7 @@ import Link from 'next/link';
 import CardModal from '@/components/CardModal';
 import CreateCardModal from '@/components/CreateCardModal';
 import ProjectStatsModal from '@/components/ProjectStatsModal';
+import ProjectSettingsModal from '@/components/ProjectSettingsModal';
 
 interface Card {
   id: string;
@@ -58,6 +59,7 @@ export default function KanbanBoard() {
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
   const [newColumnName, setNewColumnName] = useState('');
   const [showStats, setShowStats] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const fetchBoard = useCallback(async () => {
     try {
@@ -186,7 +188,10 @@ export default function KanbanBoard() {
            >
               <BarChart3 className="w-4 h-4" /> Stats
            </button>
-           <button className="flex items-center gap-2 px-3 py-2 bg-secondary rounded-xl text-sm font-medium hover:bg-border transition-all">
+           <button 
+             onClick={() => setShowSettings(true)}
+             className="flex items-center gap-2 px-3 py-2 bg-secondary rounded-xl text-sm font-medium hover:bg-border transition-all"
+           >
               <Settings className="w-4 h-4" /> Settings
            </button>
            <button 
@@ -374,6 +379,14 @@ export default function KanbanBoard() {
         <ProjectStatsModal
           projectId={projectId as string}
           onClose={() => setShowStats(false)}
+        />
+      )}
+
+      {showSettings && (
+        <ProjectSettingsModal
+          projectId={projectId as string}
+          onClose={() => setShowSettings(false)}
+          onUpdated={fetchBoard}
         />
       )}
     </div>

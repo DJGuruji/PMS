@@ -47,6 +47,24 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid column target' }, { status: 400 });
     }
 
+    // Enforce card movement mode
+    const project = await prisma.project.findUnique({
+      where: { id: existingCard.projectId },
+      select: { cardMovementMode: true },
+    });
+
+    if (project?.cardMovementMode === 'FORWARD_ONLY' && columnId !== existingCard.columnId) {
+      const currentColumn = await prisma.column.findUnique({
+        where: { id: existingCard.columnId },
+        select: { order: true },
+      });
+      if (currentColumn && targetColumn.order < currentColumn.order) {
+        return NextResponse.json({
+          error: 'Card movement is restricted to forward direction only in this project.',
+        }, { status: 403 });
+      }
+    }
+
     const oldColumnId = existingCard.columnId;
     const oldOrder = existingCard.order;
 

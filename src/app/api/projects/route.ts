@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { checkRole, getUserId } from '@/lib/rbac';
 import { Role } from '@prisma/client';
 import { z } from 'zod';
+import { serializeBigInt } from '@/lib/serializer';
 
 const projectSchema = z.object({
   name: z.string().min(3, 'Project name must be at least 3 characters'),
@@ -76,7 +77,7 @@ export async function POST(req: Request) {
       return newProject;
     });
 
-    return NextResponse.json(project, { status: 201 });
+    return NextResponse.json(serializeBigInt(project), { status: 201 });
   } catch (error) {
     console.error('Project creation error:', error);
     return NextResponse.json(
@@ -123,7 +124,7 @@ export async function GET(req: Request) {
     ]);
 
     return NextResponse.json({
-      projects,
+      projects: projects.map(serializeBigInt),
       pagination: {
         total,
         page,
