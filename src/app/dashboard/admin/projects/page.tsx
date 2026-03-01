@@ -4,10 +4,11 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   Folder, Search, Trash2, Loader2, X, ChevronLeft,
   ChevronRight, Users, Layers, Clock, CheckCircle2,
-  Play, Pause, StopCircle, AlertTriangle,
+  Play, Pause, StopCircle, AlertTriangle, Settings,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { formatDistanceToNow } from 'date-fns';
+import ProjectSettingsModal from '@/components/ProjectSettingsModal';
 import Link from 'next/link';
 
 interface Project {
@@ -87,6 +88,7 @@ export default function ProjectManagementPage() {
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [toast, setToast]           = useState('');
+  const [settingsTarget, setSettingsTarget] = useState<string | null>(null);
 
   const fetchProjects = useCallback(async () => {
     setIsLoading(true);
@@ -222,8 +224,13 @@ export default function ProjectManagementPage() {
                     <Layers className="w-3.5 h-3.5" /> {p._count.cards}
                   </span>
 
-                  {/* Delete */}
-                  <div className="flex justify-end">
+                  {/* Actions */}
+                  <div className="flex justify-end gap-1">
+                    <button onClick={() => setSettingsTarget(p.id)}
+                      className="p-2 hover:bg-primary/10 hover:text-primary text-muted-foreground rounded-lg transition-colors"
+                      title="Project Settings">
+                      <Settings className="w-4 h-4" />
+                    </button>
                     <button onClick={() => setDeleteTarget(p)}
                       className="p-2 hover:bg-destructive/10 hover:text-destructive text-muted-foreground rounded-lg transition-colors"
                       title="Delete project">
@@ -258,6 +265,15 @@ export default function ProjectManagementPage() {
       {deleteTarget && (
         <DeleteConfirm project={deleteTarget} onConfirm={handleDelete}
           onCancel={() => setDeleteTarget(null)} isDeleting={isDeleting} />
+      )}
+
+      {/* Settings Modal */}
+      {settingsTarget && (
+        <ProjectSettingsModal 
+          projectId={settingsTarget} 
+          onClose={() => setSettingsTarget(null)} 
+          onUpdated={fetchProjects} 
+        />
       )}
 
       {/* Toast */}

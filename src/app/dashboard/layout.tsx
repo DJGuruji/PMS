@@ -60,7 +60,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {
             label: 'Admin',
             items: [
-              { name: 'Organizations',      href: '/dashboard/admin/organizations', icon: Building2 },
+              { name: 'Organizations Management',      href: '/dashboard/admin/organizations', icon: Building2 },
               { name: 'User Management',    href: '/dashboard/admin/users',         icon: Users     },
               { name: 'Project Management', href: '/dashboard/admin/projects',      icon: Folder    },
             ],

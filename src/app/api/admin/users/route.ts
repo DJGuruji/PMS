@@ -9,7 +9,7 @@ const createSchema = z.object({
   email: z.string().email(),
   name: z.string().min(2).optional(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  role: z.enum(['ADMIN', 'MEMBER']).default('MEMBER'),
+  role: z.enum(['ADMIN', 'SUB_ADMIN', 'MEMBER']).default('MEMBER'),
 });
 
 // GET /api/admin/users?page=1&limit=10&search=
