@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { checkRole, getUserId } from '@/lib/rbac';
+import { checkRoleIn, getUserId } from '@/lib/rbac';
 import { Role } from '@prisma/client';
 import { z } from 'zod';
 import { serializeBigInt } from '@/lib/serializer';
@@ -12,8 +12,8 @@ const projectSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    // Only global Admins can create projects
-    const rbacError = checkRole(req, Role.ADMIN);
+    // ADMIN and SUB_ADMIN can create projects
+    const rbacError = checkRoleIn(req, [Role.ADMIN, Role.SUB_ADMIN]);
     if (rbacError) return rbacError;
 
     const userId = getUserId(req);
@@ -60,18 +60,6 @@ export async function POST(req: Request) {
           order: index + 1,
           projectId: newProject.id,
         })),
-      });
-
-      // Log project creation
-      await tx.auditLog.create({
-        data: {
-          userId,
-          projectId: newProject.id,
-          action: 'CREATE',
-          entity: 'PROJECT',
-          entityId: newProject.id,
-          details: { name: newProject.name }
-        }
       });
 
       return newProject;

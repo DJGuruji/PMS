@@ -2,34 +2,64 @@ import { Role } from '@prisma/client';
 import { NextResponse } from 'next/server';
 
 /**
- * Helper to check if the current user has the required role
- * @param req The incoming request with headers from middleware
- * @param requiredRole The role needed for the action
- * @returns Error response if unauthorized, null if authorized
+ * Get the current user's role from middleware-injected headers.
+ */
+export function getUserRole(req: Request): Role | null {
+  return (req.headers.get('x-user-role') as Role) || null;
+}
+
+/**
+ * Get the current user ID from middleware-injected headers.
+ */
+export function getUserId(req: Request): string | null {
+  return req.headers.get('x-user-id');
+}
+
+/**
+ * Check if the request user has EXACTLY the required role.
+ * ADMIN always passes any check.
  */
 export function checkRole(req: Request, requiredRole: Role) {
-  const userRole = req.headers.get('x-user-role') as Role;
-
+  const userRole = getUserRole(req);
   if (!userRole) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  // ADMIN supersedes everything
+  if (userRole === Role.ADMIN) return null;
 
-  // Admin can do anything
-  if (userRole === Role.ADMIN) {
-    return null;
+  if (userRole !== requiredRole) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
   }
-
-  // If requiring Admin but user is Member
-  if (requiredRole === Role.ADMIN && userRole === Role.MEMBER) {
-    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-  }
-
   return null;
 }
 
 /**
- * Get the current user ID from headers
+ * Check if the request user has ANY of the allowed roles.
+ * ADMIN always passes.
+ * Usage: checkRoleIn(req, [Role.ADMIN, Role.SUB_ADMIN])
  */
-export function getUserId(req: Request) {
-  return req.headers.get('x-user-id');
+export function checkRoleIn(req: Request, allowedRoles: Role[]) {
+  const userRole = getUserRole(req);
+  if (!userRole) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!allowedRoles.includes(userRole)) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+  }
+  return null;
+}
+
+/**
+ * Returns true if the user is ADMIN or SUB_ADMIN.
+ */
+export function isPrivileged(req: Request): boolean {
+  const role = getUserRole(req);
+  return role === Role.ADMIN || role === Role.SUB_ADMIN;
+}
+
+/**
+ * Returns true if the user is ADMIN only.
+ */
+export function isAdmin(req: Request): boolean {
+  return getUserRole(req) === Role.ADMIN;
 }

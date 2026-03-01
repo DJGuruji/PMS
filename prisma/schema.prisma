@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
   provider = "prisma-client-js"
@@ -13,14 +8,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
+
 enum Role {
   ADMIN
+  SUB_ADMIN
   MEMBER
-}
-
-enum CardStatus {
-  OPEN
-  CLOSED
 }
 
 enum ProjectStatus {
@@ -35,61 +28,100 @@ enum CardMovementMode {
   FORWARD_ONLY
 }
 
+
+
 model User {
-  id            String              @id @default(cuid())
-  email         String              @unique
-  password      String
-  name          String?
-  role          Role                @default(MEMBER)
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
-  
-  projects      ProjectMembership[]
-  createdProjects Project[]         @relation("ProjectCreator")
-  assignedCards Card[]              @relation("CardAssignee")
-  refreshTokens RefreshToken[]
-  auditLogs     AuditLog[]
-  movementLogs  CardMovementLog[]
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      Role     @default(MEMBER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projectMemberships ProjectMembership[]
+  orgMemberships     OrganizationMembership[]
+  createdProjects    Project[]               @relation("ProjectCreator")
+  createdOrgs        Organization[]          @relation("OrgCreator")
+  assignedCards      Card[]                  @relation("CardAssignee")
+  refreshTokens      RefreshToken[]
 }
+
+
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String
+
+  createdBy User                     @relation("OrgCreator", fields: [createdById], references: [id])
+  members   OrganizationMembership[]
+  projects  Project[]
+}
+
+
+model OrganizationMembership {
+  userId    String
+  orgId     String
+  createdAt DateTime @default(now())
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@id([userId, orgId])
+  @@index([orgId]) // supports "members of org X" query
+}
+
+
 
 model Project {
-  id                String            @id @default(cuid())
-  name              String
-  description       String?
-  creatorId         String
-  status            ProjectStatus     @default(IDLE)
-  cardMovementMode  CardMovementMode  @default(FREE)
-  startedAt         DateTime?
-  pausedAt          DateTime?
-  closedAt          DateTime?
-  totalPausedMs     BigInt            @default(0)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  id               String           @id @default(cuid())
+  name             String
+  description      String?
+  organizationId   String?
+  creatorId        String
+  status           ProjectStatus    @default(IDLE)
+  cardMovementMode CardMovementMode @default(FREE)
+  // Lifecycle timing: startedAt marks when work began.
+  // pausedAt marks when the CURRENT pause started (null when not paused).
+  // totalPausedMs accumulates all completed pause durations.
+  // closedAt removed — derivable: status=CLOSED + updatedAt.
+  startedAt     DateTime?
+  pausedAt      DateTime?
+  totalPausedMs BigInt    @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  creator     User                @relation("ProjectCreator", fields: [creatorId], references: [id])
-  members     ProjectMembership[]
-  columns     Column[]
-  labels      Label[]
-  priorities  Priority[]
-  cards       Card[]
-  auditLogs   AuditLog[]
+  organization Organization?      @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  creator      User               @relation("ProjectCreator", fields: [creatorId], references: [id])
+  members      ProjectMembership[]
+  columns      Column[]
+  labels       Label[]
+  priorities   Priority[]
+  cards        Card[]
 
-  @@index([creatorId])
+  @@index([organizationId]) // primary query: projects in org X
+  
 }
 
+
 model ProjectMembership {
-  id        String   @id @default(cuid())
   userId    String
   projectId String
   role      Role     @default(MEMBER)
   createdAt DateTime @default(now())
 
-  user    User    @relation(fields: [userId], references: [id])
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, projectId])
-  @@index([projectId])
+  @@id([userId, projectId])
+  @@index([projectId]) // supports "load all members of project X"
 }
+
+
 
 model Column {
   id        String   @id @default(cuid())
@@ -102,51 +134,67 @@ model Column {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   cards   Card[]
 
-  fromMovementLogs CardMovementLog[] @relation("FromColumn")
-  toMovementLogs   CardMovementLog[] @relation("ToColumn")
-
-  @@index([projectId])
+  // Unique on (projectId, order) enforces ordering integrity AND
+  // doubles as the index for "load columns of project X ordered by order".
+  @@unique([projectId, order])
 }
 
 model Card {
-  id          String     @id @default(cuid())
+  id          String    @id @default(cuid())
   name        String
   description String?
-  status      CardStatus @default(OPEN)
-  order       Int        @default(0)
-  
+  order       Int
   assigneeId  String?
   projectId   String
   columnId    String
   priorityId  String?
-  
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  // Replaces CardStatus enum + separate status field.
+  // null = open; non-null = closed at that instant.
   closedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  assignee    User?      @relation("CardAssignee", fields: [assigneeId], references: [id])
-  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  column      Column     @relation(fields: [columnId], references: [id])
-  priority    Priority?  @relation(fields: [priorityId], references: [id])
-  labels      Label[]    @relation("CardLabels")
-  
-  movementLogs CardMovementLog[]
+  assignee  User?      @relation("CardAssignee", fields: [assigneeId], references: [id])
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  column    Column     @relation(fields: [columnId], references: [id])
+  priority  Priority?  @relation(fields: [priorityId], references: [id])
+  labels    CardLabel[]
 
-  @@index([projectId])
-  @@index([columnId])
-  @@index([columnId, order])
-  @@index([assigneeId])
+  // Unique on (columnId, order) enforces ordering integrity (no two cards
+  // share the same slot in a column) AND serves as the index for
+  // "cards in column X ordered by order".
+  @@unique([columnId, order])
+  @@index([projectId])   // "all cards in project X" query
+  @@index([assigneeId])  // "cards assigned to user X" query
+  // Separate @@index([columnId]) removed — covered by the unique above.
+  // Separate @@index([columnId, order]) removed — IS the unique above.
 }
 
+/// Explicit join table replaces Prisma's implicit m2m.
+/// Composite PK = O(1) lookup + no extra unique index needed.
+/// @@index([labelId]) enables "cards with label X" reverse lookup.
+model CardLabel {
+  cardId  String
+  labelId String
+
+  card  Card  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, labelId])
+  @@index([labelId])
+}
+
+// ── Metadata ─────────────────────────────────────────────────────────────────
+
 model Label {
-  id        String   @id @default(cuid())
+  id        String      @id @default(cuid())
   name      String
   color     String
   projectId String
-  createdAt DateTime @default(now())
+  createdAt DateTime    @default(now())
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  cards   Card[]  @relation("CardLabels")
+  project Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  cards   CardLabel[]
 
   @@index([projectId])
 }
@@ -164,22 +212,7 @@ model Priority {
   @@index([projectId])
 }
 
-model CardMovementLog {
-  id           String   @id @default(cuid())
-  cardId       String
-  fromColumnId String?
-  toColumnId   String
-  movedById    String
-  movedAt      DateTime @default(now())
-
-  card       Card    @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  fromColumn Column? @relation("FromColumn", fields: [fromColumnId], references: [id])
-  toColumn   Column  @relation("ToColumn", fields: [toColumnId], references: [id])
-  movedBy    User    @relation(fields: [movedById], references: [id])
-
-  @@index([cardId])
-  @@index([movedAt])
-}
+// ── Auth ─────────────────────────────────────────────────────────────────────
 
 model RefreshToken {
   id        String   @id @default(cuid())
@@ -191,21 +224,4 @@ model RefreshToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-}
-
-model AuditLog {
-  id        String   @id @default(cuid())
-  userId    String
-  projectId String?
-  action    String
-  entity    String
-  entityId  String?
-  details   Json?
-  createdAt DateTime @default(now())
-
-  user    User     @relation(fields: [userId], references: [id])
-  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([projectId])
 }

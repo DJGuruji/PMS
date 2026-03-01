@@ -63,37 +63,21 @@ export async function POST(
         assigneeId,
         priorityId,
         order: newOrder,
-        labels: labelIds ? {
-          connect: labelIds.map(id => ({ id })),
-        } : undefined,
       },
       include: {
         assignee: { select: { id: true, name: true, email: true } },
         priority: true,
-        labels: true,
+        labels: { include: { label: true } },
       }
     });
 
-    // Log the initial movement (creation)
-    await prisma.cardMovementLog.create({
-      data: {
-        cardId: card.id,
-        toColumnId: columnId,
-        movedById: userId,
-      }
-    });
-
-    // Log in audit log
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        projectId,
-        action: 'CREATE',
-        entity: 'CARD',
-        entityId: card.id,
-        details: { name: card.name, column: column.name }
-      }
-    });
+    // Attach labels via explicit join table
+    if (labelIds && labelIds.length > 0) {
+      await prisma.cardLabel.createMany({
+        data: labelIds.map((labelId: string) => ({ cardId: card.id, labelId })),
+        skipDuplicates: true,
+      });
+    }
 
     return NextResponse.json(card, { status: 201 });
   } catch (error) {

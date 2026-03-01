@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/store/authStore';
 import {
   Plus,
   Folder,
@@ -107,7 +108,7 @@ function DeleteConfirmModal({
   isDeleting: boolean;
 }) {
   const [typed, setTyped] = useState('');
-  const confirmed = typed === project.name;
+  const confirmed = typed.trim() === project.name.trim();
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-in fade-in">
@@ -150,12 +151,16 @@ function DeleteConfirmModal({
           <button
             onClick={onConfirm}
             disabled={!confirmed || isDeleting}
-            className="flex-1 px-4 py-2.5 bg-destructive text-white rounded-xl font-bold hover:opacity-90 disabled:opacity-40 transition-all shadow-lg shadow-destructive/20 flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2.5 bg-destructive rounded-xl font-bold hover:opacity-90 disabled:opacity-40 transition-all shadow-lg shadow-destructive/20 flex items-center justify-center gap-2"
+            style={{ color: '#ffffff' }}
           >
             {isDeleting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" style={{ color: '#ffffff' }} />
             ) : (
-              <><Trash2 className="w-4 h-4" /> Delete</>
+              <>
+                <Trash2 className="w-4 h-4" style={{ color: '#ffffff' }} />
+                <span style={{ color: '#ffffff' }}>Delete</span>
+              </>
             )}
           </button>
         </div>
@@ -167,6 +172,8 @@ function DeleteConfirmModal({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function ProjectsPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
+  const canManageProjects = user?.role === 'ADMIN' || user?.role === 'SUB_ADMIN';
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -235,13 +242,15 @@ export default function ProjectsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
           <p className="text-muted-foreground mt-1">Manage and track your active boards</p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="bg-primary text-primary-foreground px-4 py-2.5 rounded-xl font-semibold shadow-lg shadow-primary/20 flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all"
-        >
-          <Plus className="w-5 h-5" />
-          Create Project
-        </button>
+        {canManageProjects && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="bg-primary text-primary-foreground px-4 py-2.5 rounded-xl font-semibold shadow-lg shadow-primary/20 flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all"
+          >
+            <Plus className="w-5 h-5" />
+            Create Project
+          </button>
+        )}
       </div>
 
       {/* Project Grid */}
@@ -251,12 +260,14 @@ export default function ProjectsPage() {
             <Link href={`/dashboard/projects/${project.id}`}>
               <div className="bg-card border border-border p-6 rounded-3xl hover:border-primary/50 transition-all hover:shadow-xl hover:shadow-primary/5 relative overflow-visible cursor-pointer">
 
-                {/* Top-right: chevron + menu button row */}
+                {/* Top-right: chevron + optional menu */}
                 <div className="absolute top-4 right-4 flex items-center gap-1">
-                  <ProjectCardMenu
-                    project={project}
-                    onDeleteRequest={(p) => { setDeleteError(''); setDeleteTarget(p); }}
-                  />
+                  {canManageProjects && (
+                    <ProjectCardMenu
+                      project={project}
+                      onDeleteRequest={(p) => { setDeleteError(''); setDeleteTarget(p); }}
+                    />
+                  )}
                   <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary opacity-0 group-hover:opacity-100 transition-all" />
                 </div>
 
