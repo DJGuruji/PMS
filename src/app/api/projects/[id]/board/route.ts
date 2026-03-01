@@ -29,7 +29,8 @@ export async function GET(
               select: { id: true, name: true, email: true }
             },
             priority: true,
-            labels: true,
+            labels: { include: { label: true } },
+            holds: { where: { endedAt: null } },
           }
         }
       }

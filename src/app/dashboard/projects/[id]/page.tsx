@@ -22,7 +22,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import api from '@/lib/api';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 import CardModal from '@/components/CardModal';
 import CreateCardModal from '@/components/CreateCardModal';
@@ -38,7 +38,8 @@ interface Card {
   createdAt: string;
   assignee: { id: string; name: string; email: string } | null;
   priority: { id: string; name: string; weight: number } | null;
-  labels: { id: string; name: string; color: string }[];
+  labels: { label: { id: string; name: string; color: string } }[];
+  holds?: { id: string; reason: string; startedAt: string; endedAt: string | null }[];
 }
 
 interface Column {
@@ -93,6 +94,24 @@ export default function KanbanBoard() {
   useEffect(() => {
     fetchBoard();
   }, [fetchBoard]);
+
+  const toggleHold = async (e: React.MouseEvent, card: Card) => {
+    e.stopPropagation();
+    const isActive = card.holds?.some(h => !h.endedAt);
+    try {
+      if (isActive) {
+        if (!confirm('Resume this card?')) return;
+        await api.post(`/cards/${card.id}/hold`, {});
+      } else {
+        const reason = window.prompt("Reason for putting card on hold:");
+        if (!reason) return;
+        await api.post(`/cards/${card.id}/hold`, { reason });
+      }
+      fetchBoard();
+    } catch (error) {
+       console.error("Failed to toggle hold", error);
+    }
+  };
 
   const onDragEnd = async (result: DropResult) => {
     const { destination, source, draggableId } = result;
@@ -262,15 +281,19 @@ export default function KanbanBoard() {
                     {column.cards.map((card, index) => (
                       <Draggable key={card.id} draggableId={card.id} index={index}>
                         {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            onClick={() => setSelectedCardId(card.id)}
-                            className={`bg-card p-4 rounded-2xl border border-border shadow-sm group hover:shadow-md hover:border-primary/30 transition-all ${
-                              snapshot.isDragging ? 'rotate-2 scale-105 shadow-2xl z-50 ring-2 ring-primary/20' : ''
-                            }`}
-                          >
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              onClick={() => setSelectedCardId(card.id)}
+                              className={`p-4 rounded-2xl border transition-all group ${
+                                card.holds?.some(h => !h.endedAt)
+                                  ? 'bg-destructive/20 border-destructive/40 border ring-1 ring-destructive/30 opacity-50 saturate-50 shadow-none'
+                                  : 'bg-card border-border shadow-sm hover:shadow-md hover:border-primary/30'
+                              } ${
+                                snapshot.isDragging ? 'rotate-2 scale-105 shadow-2xl z-50 ring-2 ring-primary/20' : ''
+                              }`}
+                            >
                             <div className="flex flex-wrap gap-1.5 mb-3">
                               {card.priority && (
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
@@ -283,12 +306,14 @@ export default function KanbanBoard() {
                                   {card.priority.name}
                                 </span>
                               )}
-                              {card.labels.map(label => (
+                              {card.labels.map(({ label }) => (
                                 <span 
                                   key={label.id} 
-                                  className="w-8 h-1.5 rounded-full" 
+                                  className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white shadow-sm" 
                                   style={{ backgroundColor: label.color }}
-                                />
+                                >
+                                  {label.name}
+                                </span>
                               ))}
                             </div>
 
@@ -300,10 +325,13 @@ export default function KanbanBoard() {
                             <div className="mt-4 pt-4 border-t border-border flex items-center justify-between text-muted-foreground">
                                <div className="flex items-center gap-3">
                                   {card.assignee ? (
-                                    <div className="flex items-center gap-1.5 cursor-help" title={card.assignee.name}>
-                                       <div className="w-5 h-5 bg-primary/20 rounded-full flex items-center justify-center text-[8px] font-bold text-primary border border-primary/20">
-                                          {card.assignee.name[0].toUpperCase()}
+                                    <div className="flex items-center gap-1.5 cursor-help bg-secondary/50 px-2 py-0.5 rounded-full border border-border/70 group-hover:bg-secondary transition-colors" title={card.assignee.name}>
+                                       <div className="w-4 h-4 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-[9px] font-bold shadow-sm">
+                                          {card.assignee.name ? card.assignee.name[0].toUpperCase() : '?'}
                                        </div>
+                                       <span className="text-[10px] font-bold text-foreground max-w-[80px] truncate">
+                                          {card.assignee.name || card.assignee.email}
+                                       </span>
                                     </div>
                                   ) : (
                                     <div className="p-1 border border-dashed border-border rounded-full cursor-help hover:border-muted-foreground transition-colors" title="Unassigned">
@@ -317,14 +345,26 @@ export default function KanbanBoard() {
                                </div>
                                
                                <div className="flex items-center gap-2">
-                                  <div className="flex items-center gap-1 text-[10px]">
-                                     <MessageSquare className="w-3 h-3" />
-                                     <span>2</span>
-                                  </div>
-                                  <div className="flex items-center gap-1 text-[10px]">
-                                     <Paperclip className="w-3 h-3" />
-                                     <span>1</span>
-                                  </div>
+                                  {card.holds?.some(h => !h.endedAt) ? (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] font-medium text-destructive">
+                                        Paused {formatDistanceToNow(new Date(card.holds.find(h => !h.endedAt)!.startedAt))}
+                                      </span>
+                                      <button 
+                                        onClick={(e) => toggleHold(e, card)}
+                                        className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-md shadow-sm active:scale-95 transition-all hover:opacity-90"
+                                      >
+                                        Resume
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button 
+                                      onClick={(e) => toggleHold(e, card)}
+                                      className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold bg-secondary hover:bg-destructive/10 hover:text-destructive text-muted-foreground rounded-md transition-all z-10 opacity-0 group-hover:opacity-100"
+                                    >
+                                      Hold
+                                    </button>
+                                  )}
                                </div>
                             </div>
                           </div>

@@ -63,6 +63,11 @@ export async function POST(
         assigneeId,
         priorityId,
         order: newOrder,
+        columnTimes: {
+          create: {
+            columnId,
+          }
+        },
       },
       include: {
         assignee: { select: { id: true, name: true, email: true } },

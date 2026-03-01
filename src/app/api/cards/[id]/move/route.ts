@@ -115,13 +115,24 @@ export async function PATCH(
           where: { id: cardId },
           data: { columnId, order: newOrder },
         });
+
+        // 4. Update the timeline interval
+        await tx.cardColumnTime.updateMany({
+          where: { cardId, endedAt: null },
+          data: { endedAt: new Date() },
+        });
+        await tx.cardColumnTime.create({
+          data: { cardId, columnId },
+        });
       }
 
-      // Update the card itself (same column reorder)
-      await tx.card.update({
-        where: { id: cardId },
-        data: { columnId, order: newOrder },
-      });
+      // Update the card itself (same column reorder doesn't change intervals)
+      if (oldColumnId === columnId) {
+        await tx.card.update({
+          where: { id: cardId },
+          data: { columnId, order: newOrder },
+        });
+      }
     });
 
     return NextResponse.json({ message: 'Card moved successfully' });

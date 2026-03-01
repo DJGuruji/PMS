@@ -49,7 +49,10 @@ export default function CardModal({ cardId, onClose, onDeleted }: CardModalProps
   const [priorities, setPriorities] = useState<any[]>([]);
   const [labels, setLabels] = useState<any[]>([]);
   const [selectedPriorityId, setSelectedPriorityId] = useState<string>('');
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>('');
   const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>([]);
+  const [isLabelDropdownOpen, setIsLabelDropdownOpen] = useState(false);
+  const [members, setMembers] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -67,15 +70,18 @@ export default function CardModal({ cardId, onClose, onDeleted }: CardModalProps
         setEditedName(cardData.name);
         setEditedDescription(cardData.description || '');
         setSelectedPriorityId(cardData.priorityId || '');
-        setSelectedLabelIds(cardData.labels?.map((l: any) => l.id) || []);
+        setSelectedAssigneeId(cardData.assigneeId || '');
+        setSelectedLabelIds(cardData.labels?.map((l: any) => l.label.id) || []);
         
         if (cardData.projectId) {
-           const [pResp, lResp] = await Promise.all([
+           const [pResp, lResp, mResp] = await Promise.all([
              api.get(`/projects/${cardData.projectId}/priorities`),
-             api.get(`/projects/${cardData.projectId}/labels`)
+             api.get(`/projects/${cardData.projectId}/labels`),
+             api.get(`/projects/${cardData.projectId}/members`)
            ]);
            setPriorities(pResp.data);
            setLabels(lResp.data);
+           setMembers(mResp.data.members || []);
         }
       } catch (e) {
         console.error('Failed to fetch card details', e);
@@ -93,6 +99,7 @@ export default function CardModal({ cardId, onClose, onDeleted }: CardModalProps
         name: editedName,
         description: editedDescription,
         priorityId: selectedPriorityId || null,
+        assigneeId: selectedAssigneeId || null,
         labelIds: selectedLabelIds
       });
       setIsEditing(false);
@@ -267,33 +274,101 @@ export default function CardModal({ cardId, onClose, onDeleted }: CardModalProps
 
                  <div className="space-y-3">
                     <h3 className="font-bold text-sm tracking-wide uppercase text-muted-foreground flex items-center gap-2">
+                       Assignee
+                    </h3>
+                    {isEditing ? (
+                      <select 
+                        value={selectedAssigneeId}
+                        onChange={(e) => setSelectedAssigneeId(e.target.value)}
+                        className="w-full bg-secondary border border-border rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-primary/20 appearance-none"
+                      >
+                         <option value="">Unassigned</option>
+                         {members.map(m => (
+                           <option key={m.user.id} value={m.user.id}>{m.user.name || m.user.email}</option>
+                         ))}
+                      </select>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        {card?.assignee ? (
+                          <div className="flex items-center gap-2 cursor-help bg-secondary/80 px-3 py-1.5 rounded-full border border-border/70 hover:bg-secondary transition-colors" title={card.assignee.name}>
+                             <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm">
+                                {card.assignee.name ? card.assignee.name[0].toUpperCase() : '?'}
+                             </div>
+                             <span className="text-sm font-bold text-foreground">
+                                {card.assignee.name || card.assignee.email}
+                             </span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground italic text-sm">Unassigned</span>
+                        )}
+                      </div>
+                    )}
+                 </div>
+              </div>
+              
+              <div className="grid grid-cols-1 gap-6">
+                 <div className="space-y-3">
+                    <h3 className="font-bold text-sm tracking-wide uppercase text-muted-foreground flex items-center gap-2">
                        Labels
                     </h3>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 relative">
                        {isEditing ? (
-                         labels.map(l => (
-                           <button
-                             key={l.id}
-                             onClick={() => toggleLabel(l.id)}
-                             className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all border ${
-                               selectedLabelIds.includes(l.id) 
-                                 ? 'ring-2 ring-primary ring-offset-2 ring-offset-card scale-105' 
-                                 : 'opacity-40 hover:opacity-100'
-                             }`}
-                             style={{ backgroundColor: l.color, color: '#fff' }}
+                         <div className="w-full">
+                           <div 
+                             onClick={() => setIsLabelDropdownOpen(!isLabelDropdownOpen)}
+                             className="w-full px-4 py-2.5 bg-secondary border border-border rounded-xl cursor-pointer hover:border-primary/50 transition-colors flex flex-wrap gap-2 items-center min-h-[46px]"
                            >
-                             {l.name}
-                           </button>
-                         ))
+                              {selectedLabelIds.length === 0 ? (
+                                <span className="text-muted-foreground text-sm">Select labels...</span>
+                              ) : (
+                                labels.filter(l => selectedLabelIds.includes(l.id)).map(label => (
+                                  <span
+                                    key={label.id}
+                                    className="px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm"
+                                    style={{ backgroundColor: label.color, color: '#fff' }}
+                                  >
+                                    {label.name}
+                                  </span>
+                                ))
+                              )}
+                           </div>
+
+                           {isLabelDropdownOpen && (
+                             <div className="absolute top-[100%] left-0 w-full mt-2 p-3 bg-card border border-border rounded-xl shadow-xl z-50 flex flex-col gap-2 max-h-48 overflow-y-auto">
+                               {labels.length === 0 ? (
+                                  <span className="text-muted-foreground text-sm p-2 text-center">No labels available in this project.</span>
+                               ) : (
+                                  labels.map(label => (
+                                    <button
+                                      key={label.id}
+                                      type="button"
+                                      onClick={() => toggleLabel(label.id)}
+                                      className={`flex flex-1 justify-between items-center px-3 py-2 rounded-lg text-sm font-bold transition-all border ${
+                                        selectedLabelIds.includes(label.id) 
+                                          ? 'ring-2 ring-primary ring-offset-1 ring-offset-card' 
+                                            : 'opacity-80 hover:opacity-100 hover:bg-secondary'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <span className="w-4 h-4 rounded-full" style={{ backgroundColor: label.color }} />
+                                        {label.name}
+                                      </div>
+                                      {selectedLabelIds.includes(label.id) && <span className="text-primary text-xs">Selected</span>}
+                                    </button>
+                                  ))
+                               )}
+                             </div>
+                           )}
+                         </div>
                        ) : (
                          card?.labels?.length > 0 ? (
                             card.labels.map((l: any) => (
                               <span 
-                                key={l.id} 
+                                key={l.label?.id || l.id} 
                                 className="px-3 py-1 rounded-full text-[10px] font-bold border border-white/10"
-                                style={{ backgroundColor: l.color, color: '#fff' }}
+                                style={{ backgroundColor: l.label?.color || l.color, color: '#fff' }}
                               >
-                                {l.name}
+                                {l.label?.name || l.name}
                               </span>
                             ))
                          ) : (
@@ -329,7 +404,7 @@ export default function CardModal({ cardId, onClose, onDeleted }: CardModalProps
                 <div className="relative space-y-4">
                    <div className="absolute left-[23px] top-6 bottom-6 w-0.5 bg-border -z-10" />
                    
-                   {timeline.timeline.map((step: any, index: number) => (
+                   {timeline?.timeline?.map((step: any, index: number) => (
                       <div key={index} className="flex gap-6 group">
                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border-4 border-card transition-all ${
                             step.isCurrent ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30 ring-4 ring-primary/10' : 'bg-secondary text-muted-foreground group-hover:bg-border'

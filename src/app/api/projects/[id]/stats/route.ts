@@ -17,51 +17,83 @@ export async function GET(
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    const cards = await prisma.card.findMany({
-      where: { projectId },
-      select: { createdAt: true, closedAt: true }
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        pauses: true,
+        cards: {
+          include: {
+            columnTimes: true,
+            column: true,
+          }
+        },
+        columns: true
+      }
     });
 
-    if (cards.length === 0) {
-      return NextResponse.json({
-        message: 'No cards in project yet',
-        stats: null
-      });
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+
+    const now = new Date();
+
+    // 1. Project Duration Logic
+    let totalElapsedMs = 0;
+    if (project.startedAt) {
+      const endTime = project.status === 'CLOSED' ? project.updatedAt : now;
+      totalElapsedMs = endTime.getTime() - project.startedAt.getTime();
     }
 
-    const firstCard = await prisma.card.findFirst({
-      where: { projectId },
-      orderBy: { createdAt: 'asc' },
-      select: { createdAt: true }
+    let totalPausedMs = 0;
+    project.pauses.forEach(p => {
+      const end = p.endedAt || now;
+      totalPausedMs += end.getTime() - p.startedAt.getTime();
     });
 
-    const isAllClosed = cards.every((c: any) => c.closedAt !== null);
-    let projectEndTime = null;
+    const activeMs = totalElapsedMs > totalPausedMs ? totalElapsedMs - totalPausedMs : 0;
 
-    if (isAllClosed) {
-      const lastClosed = await prisma.card.findFirst({
-        where: { projectId },
-        orderBy: { closedAt: 'desc' },
-        select: { closedAt: true }
+    // 2. Card Statistics
+    const totalCards = project.cards.length;
+    const closedCards = project.cards.filter(c => c.closedAt !== null).length;
+
+    // 3. Column Distribution & Time
+    const columnStats = project.columns.map(col => {
+      const cardsInCol = project.cards.filter(c => c.columnId === col.id).length;
+      
+      // Calculate avg time spent in this column
+      const cardTimesInCol = project.cards.flatMap(c => 
+        c.columnTimes.filter(ct => ct.columnId === col.id)
+      );
+      
+      let totalMsInCol = 0;
+      cardTimesInCol.forEach(ct => {
+        const end = ct.endedAt || now;
+        totalMsInCol += end.getTime() - ct.startedAt.getTime();
       });
-      projectEndTime = lastClosed?.closedAt;
-    }
 
-    const totalCards = cards.length;
-    const closedCards = cards.filter((c: any) => c.closedAt !== null).length;
-    const openCards = totalCards - closedCards;
+      return {
+        id: col.id,
+        name: col.name,
+        cardCount: cardsInCol,
+        averageTimeMinutes: cardTimesInCol.length > 0 ? Math.floor((totalMsInCol / cardTimesInCol.length) / 60000) : 0,
+        totalTimeMinutes: Math.floor(totalMsInCol / 60000)
+      };
+    });
 
     return NextResponse.json({
       projectId,
-      stats: {
-        startTime: firstCard?.createdAt,
-        endTime: projectEndTime,
-        isCompleted: isAllClosed,
-        totalCards,
-        openCards,
-        closedCards,
+      name: project.name,
+      status: project.status,
+      durations: {
+        activeSeconds: Math.floor(activeMs / 1000),
+        pausedSeconds: Math.floor(totalPausedMs / 1000),
+        totalSeconds: Math.floor(totalElapsedMs / 1000),
+      },
+      cards: {
+        total: totalCards,
+        open: totalCards - closedCards,
+        closed: closedCards,
         completionPercentage: totalCards > 0 ? (closedCards / totalCards) * 100 : 0
-      }
+      },
+      columns: columnStats
     });
   } catch (error) {
     console.error('Project stats error:', error);

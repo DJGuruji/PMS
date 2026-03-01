@@ -3,7 +3,6 @@ import prisma from '@/lib/prisma';
 import { getUserId } from '@/lib/rbac';
 import { canManageProject } from '@/lib/project-rbac';
 import { z } from 'zod';
-import { serializeBigInt } from '@/lib/serializer';
 
 const lifecycleSchema = z.object({
   action: z.enum(['start', 'pause', 'resume', 'close']),
@@ -33,7 +32,7 @@ export async function POST(
 
     const project = await prisma.project.findUnique({
       where: { id: projectId },
-      select: { status: true, startedAt: true, pausedAt: true, totalPausedMs: true },
+      select: { status: true, startedAt: true },
     });
 
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
@@ -52,52 +51,51 @@ export async function POST(
       }, { status: 409 });
     }
 
-    let updateData: Record<string, unknown> = {};
+    await prisma.$transaction(async (tx) => {
+      switch (action) {
+        case 'start':
+          await tx.project.update({
+            where: { id: projectId },
+            data: { status: 'ACTIVE', startedAt: now },
+          });
+          break;
 
-    switch (action) {
-      case 'start':
-        updateData = { status: 'ACTIVE', startedAt: now };
-        break;
+        case 'pause':
+          await tx.project.update({
+            where: { id: projectId },
+            data: { status: 'PAUSED' },
+          });
+          await tx.projectPause.create({
+            data: { projectId, startedAt: now },
+          });
+          break;
 
-      case 'pause':
-        updateData = { status: 'PAUSED', pausedAt: now };
-        break;
+        case 'resume':
+          await tx.project.update({
+            where: { id: projectId },
+            data: { status: 'ACTIVE' },
+          });
+          await tx.projectPause.updateMany({
+            where: { projectId, endedAt: null },
+            data: { endedAt: now },
+          });
+          break;
 
-      case 'resume': {
-        const pauseDurationMs = project.pausedAt
-          ? BigInt(now.getTime()) - BigInt(project.pausedAt.getTime())
-          : BigInt(0);
-        updateData = {
-          status: 'ACTIVE',
-          pausedAt: null,
-          totalPausedMs: project.totalPausedMs + pauseDurationMs,
-        };
-        break;
+        case 'close':
+          await tx.project.update({
+            where: { id: projectId },
+            data: { status: 'CLOSED' },
+          });
+          // Also close any active pause if it was paused
+          await tx.projectPause.updateMany({
+            where: { projectId, endedAt: null },
+            data: { endedAt: now },
+          });
+          break;
       }
-
-      case 'close': {
-        let additionalPausedMs = BigInt(0);
-        if (project.status === 'PAUSED' && project.pausedAt) {
-          additionalPausedMs = BigInt(now.getTime()) - BigInt(project.pausedAt.getTime());
-        }
-        // closedAt removed — derive close time from updatedAt when status=CLOSED
-        updateData = {
-          status: 'CLOSED',
-          pausedAt: null,
-          totalPausedMs: project.totalPausedMs + additionalPausedMs,
-        };
-        break;
-      }
-    }
-
-    // No transaction needed — single write, no audit log
-    const updated = await prisma.project.update({
-      where: { id: projectId },
-      data: updateData,
     });
 
-    // Serialize BigInt for JSON
-    return NextResponse.json(serializeBigInt(updated));
+    return NextResponse.json({ message: `Project ${action}ed successfully` });
   } catch (error) {
     console.error('Project lifecycle error:', error);
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
@@ -122,9 +120,10 @@ export async function GET(
       select: {
         status: true,
         startedAt: true,
-        pausedAt: true,
-        totalPausedMs: true,
-        updatedAt: true,  // used as closedAt when status=CLOSED
+        updatedAt: true,
+        pauses: {
+          orderBy: { startedAt: 'asc' },
+        },
       },
     });
 
@@ -132,27 +131,32 @@ export async function GET(
 
     const now = new Date();
 
-    // Compute live elapsed active time server-side
-    let totalElapsedMs = BigInt(0);
+    // Compute live elapsed active time
+    let totalElapsedMs = 0;
     if (project.startedAt) {
-      // When closed, updatedAt is the close time (closedAt removed from schema)
       const endTime = project.status === 'CLOSED' ? project.updatedAt : now;
-      totalElapsedMs = BigInt(endTime.getTime()) - BigInt(project.startedAt.getTime());
+      totalElapsedMs = endTime.getTime() - project.startedAt.getTime();
     }
 
-    let livePausedMs = project.totalPausedMs;
-    if (project.status === 'PAUSED' && project.pausedAt) {
-      livePausedMs += BigInt(now.getTime()) - BigInt(project.pausedAt.getTime());
-    }
+    let totalPausedMs = 0;
+    let currentPauseStartedAt = null;
 
-    const activeMs = totalElapsedMs > livePausedMs ? totalElapsedMs - livePausedMs : BigInt(0);
+    project.pauses.forEach(pause => {
+      const end = pause.endedAt || now;
+      totalPausedMs += end.getTime() - pause.startedAt.getTime();
+      if (!pause.endedAt) {
+        currentPauseStartedAt = pause.startedAt;
+      }
+    });
+
+    const activeMs = totalElapsedMs > totalPausedMs ? totalElapsedMs - totalPausedMs : 0;
 
     return NextResponse.json({
       status: project.status,
       startedAt: project.startedAt,
-      pausedAt: project.pausedAt,
+      pausedAt: currentPauseStartedAt,
       closedAt: project.status === 'CLOSED' ? project.updatedAt : null,
-      totalPausedMs: livePausedMs.toString(),
+      totalPausedMs: totalPausedMs.toString(),
       activeMs: activeMs.toString(),
       totalElapsedMs: totalElapsedMs.toString(),
     });

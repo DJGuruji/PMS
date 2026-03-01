@@ -90,8 +90,6 @@ model Project {
   // totalPausedMs accumulates all completed pause durations.
   // closedAt removed — derivable: status=CLOSED + updatedAt.
   startedAt     DateTime?
-  pausedAt      DateTime?
-  totalPausedMs BigInt    @default(0)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -102,6 +100,7 @@ model Project {
   labels       Label[]
   priorities   Priority[]
   cards        Card[]
+  pauses       ProjectPause[]
 
   @@index([organizationId]) // primary query: projects in org X
   
@@ -133,6 +132,7 @@ model Column {
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   cards   Card[]
+  cardTimes CardColumnTime[]
 
   // Unique on (projectId, order) enforces ordering integrity AND
   // doubles as the index for "load columns of project X ordered by order".
@@ -159,6 +159,8 @@ model Card {
   column    Column     @relation(fields: [columnId], references: [id])
   priority  Priority?  @relation(fields: [priorityId], references: [id])
   labels    CardLabel[]
+  columnTimes CardColumnTime[]
+  holds     CardHold[]
 
   // Unique on (columnId, order) enforces ordering integrity (no two cards
   // share the same slot in a column) AND serves as the index for
@@ -182,6 +184,42 @@ model CardLabel {
 
   @@id([cardId, labelId])
   @@index([labelId])
+}
+
+// ── Time Tracking ────────────────────────────────────────────────────────────
+
+model ProjectPause {
+  projectId String
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, startedAt])
+}
+
+model CardColumnTime {
+  cardId    String
+  columnId  String
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  column Column @relation(fields: [columnId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, startedAt])
+  @@index([columnId])
+}
+
+model CardHold {
+  cardId    String
+  reason    String
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, startedAt])
 }
 
 // ── Metadata ─────────────────────────────────────────────────────────────────
