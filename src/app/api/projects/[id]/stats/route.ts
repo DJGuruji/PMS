@@ -19,7 +19,7 @@ export async function GET(
 
     const cards = await prisma.card.findMany({
       where: { projectId },
-      select: { createdAt: true, closedAt: true, status: true }
+      select: { createdAt: true, closedAt: true }
     });
 
     if (cards.length === 0) {
@@ -35,7 +35,7 @@ export async function GET(
       select: { createdAt: true }
     });
 
-    const isAllClosed = cards.every((c: any) => c.status === 'CLOSED');
+    const isAllClosed = cards.every((c: any) => c.closedAt !== null);
     let projectEndTime = null;
 
     if (isAllClosed) {
@@ -48,7 +48,7 @@ export async function GET(
     }
 
     const totalCards = cards.length;
-    const closedCards = cards.filter((c: any) => c.status === 'CLOSED').length;
+    const closedCards = cards.filter((c: any) => c.closedAt !== null).length;
     const openCards = totalCards - closedCards;
 
     return NextResponse.json({

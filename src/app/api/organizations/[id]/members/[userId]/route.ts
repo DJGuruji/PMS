@@ -25,9 +25,19 @@ export async function DELETE(
     if (!org)        return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
     if (!membership) return NextResponse.json({ error: 'User is not a member of this organization' }, { status: 404 });
 
-    await prisma.organizationMembership.delete({
-      where: { userId_orgId: { userId: targetUserId, orgId } },
-    });
+    await prisma.$transaction([
+      // First, remove user from all projects belonging to this organization
+      prisma.projectMembership.deleteMany({
+        where: {
+          userId: targetUserId,
+          project: { organizationId: orgId },
+        },
+      }),
+      // Then remove user from the organization itself
+      prisma.organizationMembership.delete({
+        where: { userId_orgId: { userId: targetUserId, orgId } },
+      }),
+    ]);
 
     // Send removal email (fire-and-forget)
     sendOrgRemovedEmail({

@@ -19,6 +19,9 @@ import {
   Settings2,
   ToggleLeft,
   ToggleRight,
+  UserPlus,
+  Shield,
+  User as UserIcon,
 } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -140,7 +143,7 @@ interface Props {
   onUpdated: () => void;
 }
 
-type Tab = 'general' | 'labels' | 'priorities' | 'lifecycle';
+type Tab = 'general' | 'members' | 'labels' | 'priorities' | 'lifecycle';
 
 export default function ProjectSettingsModal({ projectId, onClose, onUpdated }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('general');
@@ -163,17 +166,26 @@ export default function ProjectSettingsModal({ projectId, onClose, onUpdated }: 
   const [priorityName, setPriorityName] = useState('');
   const [priorityWeight, setPriorityWeight] = useState(5);
 
+  // Members form
+  const [members, setMembers] = useState<any[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedRole, setSelectedRole] = useState<'ADMIN' | 'MEMBER'>('MEMBER');
+
   const { activeMs, totalMs, pausedMs } = useLiveTimer(lifecycle);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [{ data: s }, { data: l }] = await Promise.all([
+      const [{ data: s }, { data: l }, { data: m }] = await Promise.all([
         api.get(`/projects/${projectId}/settings`),
         api.get(`/projects/${projectId}/lifecycle`),
+        api.get(`/projects/${projectId}/members`),
       ]);
       setSettings(s);
       setLifecycle(l);
+      setMembers(m.members || []);
+      setAvailableUsers(m.availableUsers || []);
       setProjectName(s.name);
       setProjectDesc(s.description || '');
       setMovementMode(s.cardMovementMode);
@@ -251,6 +263,28 @@ export default function ProjectSettingsModal({ projectId, onClose, onUpdated }: 
     }
   };
 
+  // ── Members ───────────────────────────────────────────────
+  const addProjectMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserId) return;
+    try {
+      await api.post(`/projects/${projectId}/members`, { userId: selectedUserId, role: selectedRole });
+      setSelectedUserId('');
+      fetchData();
+    } catch (e: any) {
+      setError(e.response?.data?.error || 'Add failed');
+    }
+  };
+
+  const removeProjectMember = async (userId: string) => {
+    try {
+      await api.delete(`/projects/${projectId}/members/${userId}`);
+      fetchData();
+    } catch (e: any) {
+      setError('Remove failed');
+    }
+  };
+
   // ── Lifecycle ─────────────────────────────────────────────
   const performLifecycleAction = async (action: 'start' | 'pause' | 'resume' | 'close') => {
     setIsSaving(true);
@@ -300,7 +334,7 @@ export default function ProjectSettingsModal({ projectId, onClose, onUpdated }: 
 
         {/* Tab bar */}
         <div className="flex gap-1 px-6 mt-5 border-b border-border shrink-0">
-          {(['general', 'labels', 'priorities', 'lifecycle'] as Tab[]).map(tab => (
+          {(['general', 'members', 'labels', 'priorities', 'lifecycle'] as Tab[]).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -393,6 +427,94 @@ export default function ProjectSettingsModal({ projectId, onClose, onUpdated }: 
               >
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
               </button>
+            </div>
+          )}
+
+          {/* ── Members ─────────────────────────────────────── */}
+          {activeTab === 'members' && (
+            <div className="space-y-6">
+              <form onSubmit={addProjectMember} className="p-5 bg-secondary/50 rounded-2xl border border-border space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <UserPlus className="w-4 h-4 text-primary" />
+                  </div>
+                  <p className="font-bold text-sm">Add Member from Organization</p>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-3">
+                  <select
+                    value={selectedUserId}
+                    onChange={e => setSelectedUserId(e.target.value)}
+                    className="flex-1 px-4 py-2.5 bg-card border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                    required
+                  >
+                    <option value="" disabled>Select a user to add...</option>
+                    {availableUsers.map(u => (
+                      <option key={u.id} value={u.id}>{u.name || 'Unnamed'} ({u.email})</option>
+                    ))}
+                    {availableUsers.length === 0 && (
+                      <option value="" disabled>No available users left in organization</option>
+                    )}
+                  </select>
+                  
+                  <select
+                    value={selectedRole}
+                    onChange={e => setSelectedRole(e.target.value as any)}
+                    className="w-full md:w-32 px-4 py-2.5 bg-card border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                  >
+                    <option value="MEMBER">Member</option>
+                    <option value="ADMIN">Admin</option>
+                  </select>
+
+                  <button
+                    type="submit"
+                    disabled={!selectedUserId}
+                    className="px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-all disabled:opacity-50"
+                  >
+                    <Plus className="w-4 h-4" /> Add
+                  </button>
+                </div>
+              </form>
+
+              <div className="space-y-2">
+                {members.length === 0 && (
+                  <p className="text-center text-muted-foreground text-sm py-8">No members in this project.</p>
+                )}
+                {members.map(m => (
+                  <div
+                    key={m.user?.id}
+                    className="flex items-center justify-between p-3 bg-secondary/40 rounded-xl border border-border group hover:border-primary/20 transition-all"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                        <UserIcon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm">{m.user?.name || 'Unnamed'}</p>
+                        <p className="text-xs text-muted-foreground">{m.user?.email}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <span className={`px-2.5 py-1 flex items-center gap-1 rounded-full text-[10px] font-bold ${
+                        m.role === 'ADMIN' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-secondary border-border text-muted-foreground'
+                      }`}>
+                        {m.role === 'ADMIN' && <Shield className="w-3 h-3" />}
+                        {m.role}
+                      </span>
+                      {m.user?.role !== 'ADMIN' && (
+                        <button
+                          onClick={() => removeProjectMember(m.user.id)}
+                          className="p-1.5 hover:bg-destructive/10 hover:text-destructive rounded-lg transition-colors text-muted-foreground opacity-0 group-hover:opacity-100"
+                          title="Remove member"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

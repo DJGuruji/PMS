@@ -65,7 +65,6 @@ export async function GET(
         cardMovementMode: true,
         startedAt: true,
         pausedAt: true,
-        closedAt: true,
         totalPausedMs: true,
         labels: { orderBy: { createdAt: 'asc' } },
         priorities: { orderBy: { weight: 'desc' } },

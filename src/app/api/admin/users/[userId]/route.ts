@@ -119,8 +119,8 @@ export async function GET(
         name: true,
         role: true,
         createdAt: true,
-        _count: { select: { projects: true, assignedCards: true } },
-        projects: {
+        _count: { select: { projectMemberships: true, assignedCards: true } },
+        projectMemberships: {
           select: {
             role: true,
             project: { select: { id: true, name: true, status: true } },

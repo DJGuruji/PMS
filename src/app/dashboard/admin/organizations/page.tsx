@@ -326,14 +326,16 @@ function OrgDetailView({
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${m.user.role === 'ADMIN' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-secondary text-muted-foreground border-border'}`}>
                   {m.user.role}
                 </span>
-                <button
-                  onClick={() => removeMember(m.userId, m.user.name || m.user.email)}
-                  disabled={removingId === m.userId}
-                  className="p-1.5 hover:bg-destructive/10 hover:text-destructive text-muted-foreground rounded-lg transition-colors disabled:opacity-50 shrink-0"
-                  title="Remove member"
-                >
-                  {removingId === m.userId ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
-                </button>
+                {m.user.role !== 'ADMIN' && (
+                  <button
+                    onClick={() => removeMember(m.userId, m.user.name || m.user.email)}
+                    disabled={removingId === m.userId}
+                    className="p-1.5 hover:bg-destructive/10 hover:text-destructive text-muted-foreground rounded-lg transition-colors disabled:opacity-50 shrink-0"
+                    title="Remove member"
+                  >
+                    {removingId === m.userId ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -509,9 +511,8 @@ export default function OrganizationsPage() {
             <div className="flex gap-3">
               <button onClick={() => setDeleteTarget(null)} className="flex-1 py-2.5 bg-secondary rounded-xl font-semibold text-sm hover:bg-border">Cancel</button>
               <button onClick={handleDelete} disabled={isDeleting}
-                className="flex-1 py-2.5 bg-destructive rounded-xl font-bold text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-destructive/20"
-                style={{ color: '#ffffff' }}>
-                {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" style={{ color: '#ffffff' }} /> : <><Trash2 className="w-4 h-4" style={{ color: '#ffffff' }} /><span style={{ color: '#ffffff' }}>Delete</span></>}
+                className="flex-1 py-2.5 bg-destructive text-white rounded-xl font-bold text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-destructive/20">
+                {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Trash2 className="w-4 h-4" /><span>Delete</span></>}
               </button>
             </div>
           </div>

@@ -64,12 +64,11 @@ function DeleteConfirm({
           <button
             onClick={onConfirm}
             disabled={!confirmed || isDeleting}
-            className="flex-1 py-2.5 bg-destructive rounded-xl font-bold text-sm hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2 shadow-lg shadow-destructive/20"
-            style={{ color: '#ffffff' }}
+            className="flex-1 py-2.5 bg-destructive text-white rounded-xl font-bold text-sm hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2 shadow-lg shadow-destructive/20"
           >
             {isDeleting
-              ? <Loader2 className="w-4 h-4 animate-spin" style={{ color: '#ffffff' }} />
-              : <><Trash2 className="w-4 h-4" style={{ color: '#ffffff' }} /><span style={{ color: '#ffffff' }}>Delete</span></>
+              ? <Loader2 className="w-4 h-4 animate-spin" />
+              : <><Trash2 className="w-4 h-4" /><span>Delete Project</span></>
             }
           </button>
         </div>

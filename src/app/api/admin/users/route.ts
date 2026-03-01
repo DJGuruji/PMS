@@ -46,7 +46,7 @@ export async function GET(req: Request) {
           role: true,
           createdAt: true,
           _count: {
-            select: { projects: true, assignedCards: true },
+            select: { projectMemberships: true, assignedCards: true },
           },
         },
       }),

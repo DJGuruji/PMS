@@ -8,6 +8,7 @@ import { serializeBigInt } from '@/lib/serializer';
 const projectSchema = z.object({
   name: z.string().min(3, 'Project name must be at least 3 characters'),
   description: z.string().optional(),
+  organizationId: z.string().optional(),
 });
 
 export async function POST(req: Request) {
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { name, description } = result.data;
+    const { name, description, organizationId } = result.data;
 
     const project = await prisma.$transaction(async (tx) => {
       // Create project
@@ -40,6 +41,7 @@ export async function POST(req: Request) {
           name,
           description,
           creatorId: userId,
+          organizationId: organizationId || null,
         },
       });
 
@@ -86,14 +88,31 @@ export async function GET(req: Request) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const skip = (page - 1) * limit;
+    const orgId = searchParams.get('orgId');
 
-    let whereClause = {};
-    if (userRole !== Role.ADMIN) {
-      whereClause = {
-        members: {
-          some: { userId }
+    let whereClause: any = {};
+    
+    if (orgId) {
+      if (userRole !== Role.ADMIN) {
+        // Enforce that user is at least part of the organization to see its projects
+        const isOrgMember = await prisma.organizationMembership.findUnique({
+          where: { userId_orgId: { userId, orgId } }
+        });
+        if (!isOrgMember) {
+           return NextResponse.json({ error: 'Access denied to organization' }, { status: 403 });
         }
-      };
+      }
+      // Return ALL projects in this org
+      whereClause.organizationId = orgId;
+    } else {
+      // No orgId provided (e.g., getting all user projects)
+      if (userRole !== Role.ADMIN) {
+        whereClause = {
+          members: {
+            some: { userId }
+          }
+        };
+      }
     }
 
     const [projects, total] = await Promise.all([
@@ -103,6 +122,9 @@ export async function GET(req: Request) {
         include: {
           _count: {
             select: { members: true, cards: true }
+          },
+          members: {
+            where: { userId }
           }
         },
         skip,
@@ -112,7 +134,10 @@ export async function GET(req: Request) {
     ]);
 
     return NextResponse.json({
-      projects: projects.map(serializeBigInt),
+      projects: projects.map(p => ({
+        ...serializeBigInt(p),
+        isJoined: p.members.length > 0
+      })),
       pagination: {
         total,
         page,

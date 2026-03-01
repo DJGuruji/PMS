@@ -15,9 +15,9 @@ interface User {
   id: string;
   email: string;
   name: string | null;
-  role: 'ADMIN' | 'MEMBER';
+  role: 'ADMIN' | 'SUB_ADMIN' | 'MEMBER';
   createdAt: string;
-  _count: { projects: number; assignedCards: number };
+  _count: { projectMemberships: number; assignedCards: number };
 }
 
 interface Pagination {
@@ -40,7 +40,7 @@ function UserFormModal({
   const isEdit = !!user;
   const [name, setName]         = useState(user?.name || '');
   const [email, setEmail]       = useState(user?.email || '');
-  const [role, setRole]         = useState<'ADMIN' | 'MEMBER'>(user?.role || 'MEMBER');
+  const [role, setRole]         = useState<'ADMIN' | 'SUB_ADMIN' | 'MEMBER'>(user?.role || 'MEMBER');
   const [password, setPassword] = useState('');
   const [resetPw, setResetPw]   = useState(false);
   const [showPw, setShowPw]     = useState(false);
@@ -114,8 +114,8 @@ function UserFormModal({
           {/* Role */}
           <div className="space-y-1.5">
             <label className="text-sm font-semibold">Role</label>
-            <div className="grid grid-cols-2 gap-2">
-              {(['MEMBER', 'ADMIN'] as const).map((r) => (
+            <div className="grid grid-cols-3 gap-2">
+              {(['MEMBER', 'SUB_ADMIN', 'ADMIN'] as const).map((r) => (
                 <button
                   key={r}
                   type="button"
@@ -124,12 +124,14 @@ function UserFormModal({
                     role === r
                       ? r === 'ADMIN'
                         ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20'
-                        : 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20'
+                        : r === 'SUB_ADMIN'
+                          ? 'bg-amber-500 text-white border-amber-500 shadow-lg shadow-amber-500/20'
+                          : 'bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20'
                       : 'bg-secondary border-border text-muted-foreground hover:border-primary/30'
                   }`}
                 >
                   <Shield className="w-3.5 h-3.5" />
-                  {r}
+                  {r === 'SUB_ADMIN' ? 'Sub Admin' : r}
                 </button>
               ))}
             </div>
@@ -382,14 +384,16 @@ export default function UserManagementPage() {
                 <span className={`px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${
                   u.role === 'ADMIN'
                     ? 'bg-primary/10 text-primary border-primary/20'
-                    : 'bg-secondary text-muted-foreground border-border'
+                    : u.role === 'SUB_ADMIN'
+                      ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                      : 'bg-secondary text-muted-foreground border-border'
                 }`}>
-                  {u.role === 'ADMIN' ? '⚡ Admin' : 'Member'}
+                  {u.role === 'ADMIN' ? '⚡ Admin' : u.role === 'SUB_ADMIN' ? '🔑 Sub Admin' : 'Member'}
                 </span>
 
                 {/* Projects count */}
                 <span className="text-center text-sm font-semibold text-muted-foreground">
-                  {u._count.projects}
+                  {u._count.projectMemberships}
                 </span>
 
                 {/* Actions */}
@@ -401,13 +405,15 @@ export default function UserManagementPage() {
                   >
                     <Pencil className="w-4 h-4" />
                   </button>
-                  <button
-                    onClick={() => setDeleteTarget(u)}
-                    className="p-2 hover:bg-destructive/10 hover:text-destructive rounded-lg transition-colors text-muted-foreground"
-                    title="Delete user"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {u.role !== 'ADMIN' && (
+                    <button
+                      onClick={() => setDeleteTarget(u)}
+                      className="p-2 hover:bg-destructive/10 hover:text-destructive rounded-lg transition-colors text-muted-foreground"
+                      title="Delete user"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

@@ -6,8 +6,11 @@ import { Role } from '@prisma/client';
 import { z } from 'zod';
 
 const inviteSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().optional(),
+  userId: z.string().optional(),
   role: z.nativeEnum(Role).default(Role.MEMBER),
+}).refine(data => data.email || data.userId, {
+  message: "Either email or userId must be provided",
 });
 
 export async function POST(
@@ -30,14 +33,29 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid input', details: result.error.format() }, { status: 400 });
     }
 
-    const { email, role } = result.data;
+    const { email, userId: targetUserId, role } = result.data;
 
-    const userToInvite = await prisma.user.findUnique({
-      where: { email },
+    const userToInvite = await prisma.user.findFirst({
+      where: targetUserId ? { id: targetUserId } : { email },
     });
 
     if (!userToInvite) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Enforce Organization membership boundary
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { organizationId: true }
+    });
+    
+    if (project?.organizationId) {
+      const isOrgMember = await prisma.organizationMembership.findUnique({
+        where: { userId_orgId: { userId: userToInvite.id, orgId: project.organizationId } }
+      });
+      if (!isOrgMember) {
+        return NextResponse.json({ error: 'User must be a member of the organization first' }, { status: 403 });
+      }
     }
 
     const membership = await prisma.projectMembership.upsert({
@@ -86,18 +104,29 @@ export async function GET(
     const members = await prisma.projectMembership.findMany({
       where: { projectId },
       include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            role: true
-          }
-        }
+        user: { select: { id: true, email: true, name: true, role: true } }
       }
     });
 
-    return NextResponse.json(members);
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { organizationId: true }
+    });
+
+    let availableUsers: { id: string, name: string | null, email: string, role: string }[] = [];
+    if (project?.organizationId) {
+      const memberIds = new Set(members.map(m => m.user.id));
+      const orgMembers = await prisma.organizationMembership.findMany({
+        where: { orgId: project.organizationId },
+        include: { user: { select: { id: true, email: true, name: true, role: true } } }
+      });
+      
+      availableUsers = orgMembers
+        .map(om => om.user)
+        .filter(u => !memberIds.has(u.id));
+    }
+
+    return NextResponse.json({ members, availableUsers });
   } catch (error) {
     console.error('Fetch members error:', error);
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });

@@ -12,7 +12,7 @@ import {
   Bell,
   Users,
   Folder,
-  Activity,
+  Settings,
   ChevronRight,
   Shield,
   Building2,
@@ -50,8 +50,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     {
       label: null,
       items: [
-        { name: 'Projects',  href: '/dashboard',          icon: Layout   },
-        { name: 'Activity',  href: '/dashboard/activity', icon: Activity },
+        { name: 'Organizations', href: '/dashboard', icon: Building2 },
+
         { name: 'Profile',   href: '/dashboard/profile',  icon: UserIcon },
       ],
     },
@@ -85,10 +85,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex overflow-hidden">
+    <div className="h-screen bg-background text-foreground flex overflow-hidden">
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
       <aside
-        className={`bg-card border-r border-border transition-all duration-300 relative z-40 flex flex-col ${
+        className={`bg-card border-r border-border transition-all duration-300 relative z-40 flex flex-col shrink-0 h-full ${
           isSidebarOpen ? 'w-64' : 'w-20'
         }`}
       >
@@ -177,8 +177,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             }`}
             title={!isSidebarOpen ? 'Logout' : undefined}
           >
-            <LogOut className="w-5 h-5 shrink-0 group-hover:-translate-x-0.5 transition-transform" />
-            {isSidebarOpen && <span className="font-medium">Logout</span>}
+            <LogOut className="w-5 h-5 shrink-0 group-hover:-translate-x-0.5 transition-transform text-red-500 hover:text-red-600 " />
+            {isSidebarOpen && <span className="font-medium text-red-500 hover:text-red-600">Logout</span>}
           </button>
         </div>
       </aside>
@@ -205,6 +205,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="flex items-center gap-3">
+            <Link href="/dashboard/settings" title="Settings" className="p-2 hover:bg-secondary text-muted-foreground hover:text-foreground rounded-lg transition-colors relative">
+              <Settings className="w-5 h-5" />
+            </Link>
+
             <button className="p-2 hover:bg-secondary rounded-lg transition-colors relative">
               <Bell className="w-5 h-5" />
               <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-card" />

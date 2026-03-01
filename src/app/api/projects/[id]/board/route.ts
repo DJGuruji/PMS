@@ -22,7 +22,7 @@ export async function GET(
       orderBy: { order: 'asc' },
       include: {
         cards: {
-          where: { status: 'OPEN' },
+          where: { closedAt: null },
           orderBy: { order: 'asc' },
           include: {
             assignee: {

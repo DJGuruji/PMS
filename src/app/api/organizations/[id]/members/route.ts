@@ -81,22 +81,6 @@ export async function POST(
       include: { user: { select: { id: true, name: true, email: true, role: true } } },
     });
 
-    // Auto-add as MEMBER to all projects in the org (if not already a member)
-    if (org.projects.length > 0) {
-      const existingProjectMemberships = await prisma.projectMembership.findMany({
-        where: { userId, projectId: { in: org.projects.map((p) => p.id) } },
-        select: { projectId: true },
-      });
-      const existingProjectIds = new Set(existingProjectMemberships.map((m) => m.projectId));
-      const newProjectIds = org.projects.filter((p) => !existingProjectIds.has(p.id)).map((p) => p.id);
-
-      if (newProjectIds.length > 0) {
-        await prisma.projectMembership.createMany({
-          data: newProjectIds.map((projectId) => ({ userId, projectId, role: Role.MEMBER })),
-          skipDuplicates: true,
-        });
-      }
-    }
 
     // Send email notification (fire-and-forget)
     const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { name: true, email: true } });
