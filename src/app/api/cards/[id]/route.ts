@@ -27,7 +27,7 @@ export async function GET(
       include: {
         assignee: { select: { id: true, name: true, email: true } },
         priority: true,
-        labels: true,
+        labels: { include: { label: true } },
       }
     });
 
@@ -76,21 +76,22 @@ export async function PATCH(
       return NextResponse.json({ error: 'Invalid input', details: result.error.format() }, { status: 400 });
     }
 
-    const { labelIds, ...updateData } = result.data;
+    const { labelIds, status, ...updateData } = result.data;
 
     const updatedCard = await prisma.card.update({
       where: { id: cardId },
       data: {
         ...updateData,
-        closedAt: updateData.status === 'CLOSED' ? new Date() : (updateData.status === 'OPEN' ? null : undefined),
+        closedAt: status === 'CLOSED' ? new Date() : (status === 'OPEN' ? null : undefined),
         labels: labelIds ? {
-          set: labelIds.map(id => ({ id })),
+          deleteMany: {},
+          create: labelIds.map(labelId => ({ labelId })),
         } : undefined,
       },
       include: {
         assignee: { select: { id: true, name: true, email: true } },
         priority: true,
-        labels: true,
+        labels: { include: { label: true } },
       }
     });
 

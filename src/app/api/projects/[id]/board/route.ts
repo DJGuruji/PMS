@@ -22,14 +22,15 @@ export async function GET(
       orderBy: { order: 'asc' },
       include: {
         cards: {
-          where: { status: 'OPEN' },
+          where: { closedAt: null },
           orderBy: { order: 'asc' },
           include: {
             assignee: {
               select: { id: true, name: true, email: true }
             },
             priority: true,
-            labels: true,
+            labels: { include: { label: true } },
+            holds: { where: { endedAt: null } },
           }
         }
       }

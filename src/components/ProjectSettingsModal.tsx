@@ -19,8 +19,13 @@ import {
   Settings2,
   ToggleLeft,
   ToggleRight,
+  UserPlus,
+  Shield,
+  User as UserIcon,
+  AlertTriangle,
 } from 'lucide-react';
 import api from '@/lib/api';
+import { useAuthStore } from '@/store/authStore';
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -140,7 +145,7 @@ interface Props {
   onUpdated: () => void;
 }
 
-type Tab = 'general' | 'labels' | 'priorities' | 'lifecycle';
+type Tab = 'general' | 'members' | 'labels' | 'priorities' | 'lifecycle';
 
 export default function ProjectSettingsModal({ projectId, onClose, onUpdated }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>('general');
@@ -163,17 +168,35 @@ export default function ProjectSettingsModal({ projectId, onClose, onUpdated }: 
   const [priorityName, setPriorityName] = useState('');
   const [priorityWeight, setPriorityWeight] = useState(5);
 
+  // Members form
+  const [members, setMembers] = useState<any[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [selectedRole, setSelectedRole] = useState<'ADMIN' | 'MEMBER'>('MEMBER');
+  const [memberToRemove, setMemberToRemove] = useState<any>(null);
+  const [isRemovingMember, setIsRemovingMember] = useState(false);
+
+  const { user } = useAuthStore();
+  const isGlobalAdmin = user?.role === 'ADMIN' || user?.role === 'SUB_ADMIN';
+  
+  // We need to know the current user's role IN THIS PROJECT specifically
+  const currentUserMembership = members.find(m => m.user?.id === user?.id);
+  const isProjectAdmin = isGlobalAdmin || currentUserMembership?.role === 'ADMIN';
+
   const { activeMs, totalMs, pausedMs } = useLiveTimer(lifecycle);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [{ data: s }, { data: l }] = await Promise.all([
+      const [{ data: s }, { data: l }, { data: m }] = await Promise.all([
         api.get(`/projects/${projectId}/settings`),
         api.get(`/projects/${projectId}/lifecycle`),
+        api.get(`/projects/${projectId}/members`),
       ]);
       setSettings(s);
       setLifecycle(l);
+      setMembers(m.members || []);
+      setAvailableUsers(m.availableUsers || []);
       setProjectName(s.name);
       setProjectDesc(s.description || '');
       setMovementMode(s.cardMovementMode);
@@ -251,6 +274,33 @@ export default function ProjectSettingsModal({ projectId, onClose, onUpdated }: 
     }
   };
 
+  // ── Members ───────────────────────────────────────────────
+  const addProjectMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUserId) return;
+    try {
+      await api.post(`/projects/${projectId}/members`, { userId: selectedUserId, role: selectedRole });
+      setSelectedUserId('');
+      fetchData();
+    } catch (e: any) {
+      setError(e.response?.data?.error || 'Add failed');
+    }
+  };
+
+  const confirmRemoveProjectMember = async () => {
+    if (!memberToRemove) return;
+    setIsRemovingMember(true);
+    try {
+      await api.delete(`/projects/${projectId}/members/${memberToRemove.user.id}`);
+      setMemberToRemove(null);
+      fetchData();
+    } catch (e: any) {
+      setError('Remove failed');
+    } finally {
+      setIsRemovingMember(false);
+    }
+  };
+
   // ── Lifecycle ─────────────────────────────────────────────
   const performLifecycleAction = async (action: 'start' | 'pause' | 'resume' | 'close') => {
     setIsSaving(true);
@@ -300,7 +350,7 @@ export default function ProjectSettingsModal({ projectId, onClose, onUpdated }: 
 
         {/* Tab bar */}
         <div className="flex gap-1 px-6 mt-5 border-b border-border shrink-0">
-          {(['general', 'labels', 'priorities', 'lifecycle'] as Tab[]).map(tab => (
+          {(['general', 'members', 'labels', 'priorities', 'lifecycle'] as Tab[]).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -364,8 +414,8 @@ export default function ProjectSettingsModal({ projectId, onClose, onUpdated }: 
                 </div>
 
                 <div
-                  onClick={() => setMovementMode(prev => prev === 'FREE' ? 'FORWARD_ONLY' : 'FREE')}
-                  className="flex items-center justify-between p-4 bg-card rounded-xl border border-border cursor-pointer hover:border-primary/30 transition-all group"
+                  onClick={() => isProjectAdmin && setMovementMode(prev => prev === 'FREE' ? 'FORWARD_ONLY' : 'FREE')}
+                  className={`flex items-center justify-between p-4 bg-card rounded-xl border border-border transition-all group ${isProjectAdmin ? 'cursor-pointer hover:border-primary/30' : 'opacity-80'}`}
                 >
                   <div className="space-y-0.5">
                     <p className="text-sm font-bold">
@@ -379,75 +429,169 @@ export default function ProjectSettingsModal({ projectId, onClose, onUpdated }: 
                   </div>
                   <div className="shrink-0 ml-4">
                     {movementMode === 'FREE'
-                      ? <ToggleLeft className="w-10 h-10 text-muted-foreground group-hover:text-primary transition-colors" />
-                      : <ToggleRight className="w-10 h-10 text-primary" />
+                      ? <ToggleLeft className={`w-10 h-10 ${isProjectAdmin ? 'text-muted-foreground group-hover:text-primary transition-colors' : 'text-muted-foreground/50'}`} />
+                      : <ToggleRight className={`w-10 h-10 ${isProjectAdmin ? 'text-primary' : 'text-primary/50'}`} />
                     }
                   </div>
                 </div>
               </div>
 
-              <button
-                onClick={saveGeneral}
-                disabled={isSaving}
-                className="w-full px-4 py-3 bg-primary text-primary-foreground rounded-xl font-bold shadow-lg shadow-primary/20 hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-              >
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
-              </button>
+              {isProjectAdmin && (
+                <button
+                  onClick={saveGeneral}
+                  disabled={isSaving}
+                  className="w-full px-4 py-3 bg-primary text-primary-foreground rounded-xl font-bold shadow-lg shadow-primary/20 hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                >
+                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Changes'}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ── Members ─────────────────────────────────────── */}
+          {activeTab === 'members' && (
+            <div className="space-y-6">
+              {isProjectAdmin && (
+                <form onSubmit={addProjectMember} className="p-5 bg-secondary/50 rounded-2xl border border-border space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center">
+                      <UserPlus className="w-4 h-4 text-primary" />
+                    </div>
+                    <p className="font-bold text-sm">Add Member from Organization</p>
+                  </div>
+
+                  <div className="flex flex-col md:flex-row gap-3">
+                    <select
+                      value={selectedUserId}
+                      onChange={e => setSelectedUserId(e.target.value)}
+                      className="flex-1 px-4 py-2.5 bg-card border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                      required
+                    >
+                      <option value="" disabled>Select a user to add...</option>
+                      {availableUsers.map(u => (
+                        <option key={u.id} value={u.id}>{u.name || 'Unnamed'} ({u.email})</option>
+                      ))}
+                      {availableUsers.length === 0 && (
+                        <option value="" disabled>No available users left in organization</option>
+                      )}
+                    </select>
+                    
+                    <select
+                      value={selectedRole}
+                      onChange={e => setSelectedRole(e.target.value as any)}
+                      className="w-full md:w-32 px-4 py-2.5 bg-card border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                    >
+                      <option value="MEMBER">Member</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+
+                    <button
+                      type="submit"
+                      disabled={!selectedUserId}
+                      className="px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-all disabled:opacity-50"
+                    >
+                      <Plus className="w-4 h-4" /> Add
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              <div className="space-y-2">
+                {members.length === 0 && (
+                  <p className="text-center text-muted-foreground text-sm py-8">No members in this project.</p>
+                )}
+                {members.map(m => (
+                  <div
+                    key={m.user?.id}
+                    className="flex items-center justify-between p-3 bg-secondary/40 rounded-xl border border-border group hover:border-primary/20 transition-all"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center text-primary">
+                        <UserIcon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm">{m.user?.name || 'Unnamed'}</p>
+                        <p className="text-xs text-muted-foreground">{m.user?.email}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <span className={`px-2.5 py-1 flex items-center gap-1 rounded-full text-[10px] font-bold ${
+                        m.role === 'ADMIN' ? 'bg-primary/10 text-primary border-primary/20' : 'bg-secondary border-border text-muted-foreground'
+                      }`}>
+                        {m.role === 'ADMIN' && <Shield className="w-3 h-3" />}
+                        {m.role}
+                      </span>
+                      {isProjectAdmin && m.user?.role !== 'ADMIN' && (
+                        <button
+                          onClick={() => setMemberToRemove(m)}
+                          className="p-1.5 hover:bg-destructive/10 hover:text-destructive rounded-lg transition-colors text-muted-foreground opacity-0 group-hover:opacity-100"
+                          title="Remove member"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
           {/* ── Labels ──────────────────────────────────────── */}
           {activeTab === 'labels' && (
             <div className="space-y-6">
-              <form onSubmit={createLabel} className="p-5 bg-secondary/50 rounded-2xl border border-border space-y-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center">
-                    <Tag className="w-4 h-4 text-primary" />
+              {isProjectAdmin && (
+                <form onSubmit={createLabel} className="p-5 bg-secondary/50 rounded-2xl border border-border space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center">
+                      <Tag className="w-4 h-4 text-primary" />
+                    </div>
+                    <p className="font-bold text-sm">Create New Label</p>
                   </div>
-                  <p className="font-bold text-sm">Create New Label</p>
-                </div>
 
-                <div className="flex gap-3">
-                  <input
-                    value={labelName}
-                    onChange={e => setLabelName(e.target.value)}
-                    placeholder="Label name"
-                    className="flex-1 px-4 py-2.5 bg-card border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20 text-sm"
-                    required
-                  />
-                  <div className="relative">
-                    <div
-                      className="w-10 h-10 rounded-xl border-2 border-border cursor-pointer shadow-sm"
-                      style={{ backgroundColor: labelColor }}
-                      title="Click to pick color"
-                    />
+                  <div className="flex gap-3">
                     <input
-                      type="color"
-                      value={labelColor}
-                      onChange={e => setLabelColor(e.target.value)}
-                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      value={labelName}
+                      onChange={e => setLabelName(e.target.value)}
+                      placeholder="Label name"
+                      className="flex-1 px-4 py-2.5 bg-card border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                      required
                     />
-                  </div>
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-all"
-                  >
-                    <Plus className="w-4 h-4" /> Add
-                  </button>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {PRESET_COLORS.map(c => (
+                    <div className="relative">
+                      <div
+                        className="w-10 h-10 rounded-xl border-2 border-border cursor-pointer shadow-sm"
+                        style={{ backgroundColor: labelColor }}
+                        title="Click to pick color"
+                      />
+                      <input
+                        type="color"
+                        value={labelColor}
+                        onChange={e => setLabelColor(e.target.value)}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                    </div>
                     <button
-                      key={c}
-                      type="button"
-                      onClick={() => setLabelColor(c)}
-                      className={`w-8 h-8 rounded-full transition-transform hover:scale-110 ${labelColor === c ? 'ring-2 ring-primary ring-offset-2 ring-offset-card scale-110' : ''}`}
-                      style={{ backgroundColor: c }}
-                    />
-                  ))}
-                </div>
-              </form>
+                      type="submit"
+                      className="px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-all"
+                    >
+                      <Plus className="w-4 h-4" /> Add
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {PRESET_COLORS.map(c => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setLabelColor(c)}
+                        className={`w-8 h-8 rounded-full transition-transform hover:scale-110 ${labelColor === c ? 'ring-2 ring-primary ring-offset-2 ring-offset-card scale-110' : ''}`}
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </div>
+                </form>
+              )}
 
               <div className="space-y-2">
                 {settings?.labels.length === 0 && (
@@ -468,12 +612,14 @@ export default function ProjectSettingsModal({ projectId, onClose, onUpdated }: 
                         {label.name}
                       </span>
                     </div>
-                    <button
-                      onClick={() => deleteLabel(label.id)}
-                      className="p-1.5 hover:bg-destructive/10 hover:text-destructive rounded-lg transition-colors text-muted-foreground opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {isProjectAdmin && (
+                      <button
+                        onClick={() => deleteLabel(label.id)}
+                        className="p-1.5 hover:bg-destructive/10 hover:text-destructive rounded-lg transition-colors text-muted-foreground opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -483,41 +629,43 @@ export default function ProjectSettingsModal({ projectId, onClose, onUpdated }: 
           {/* ── Priorities ──────────────────────────────────── */}
           {activeTab === 'priorities' && (
             <div className="space-y-6">
-              <form onSubmit={createPriority} className="p-5 bg-secondary/50 rounded-2xl border border-border space-y-4">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center">
-                    <AlertCircle className="w-4 h-4 text-primary" />
+              {isProjectAdmin && (
+                <form onSubmit={createPriority} className="p-5 bg-secondary/50 rounded-2xl border border-border space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 bg-primary/10 rounded-xl flex items-center justify-center">
+                      <AlertCircle className="w-4 h-4 text-primary" />
+                    </div>
+                    <p className="font-bold text-sm">Create New Priority</p>
                   </div>
-                  <p className="font-bold text-sm">Create New Priority</p>
-                </div>
 
-                <div className="flex gap-3">
-                  <input
-                    value={priorityName}
-                    onChange={e => setPriorityName(e.target.value)}
-                    placeholder="Priority name (e.g. Critical)"
-                    className="flex-1 px-4 py-2.5 bg-card border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20 text-sm"
-                    required
-                  />
-                  <div className="space-y-1">
+                  <div className="flex gap-3">
                     <input
-                      type="number"
-                      min={1} max={10}
-                      value={priorityWeight}
-                      onChange={e => setPriorityWeight(Number(e.target.value))}
-                      className="w-20 px-3 py-2.5 bg-card border border-border rounded-xl text-center font-bold text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                      title="Weight (1–10): higher = more urgent"
+                      value={priorityName}
+                      onChange={e => setPriorityName(e.target.value)}
+                      placeholder="Priority name (e.g. Critical)"
+                      className="flex-1 px-4 py-2.5 bg-card border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+                      required
                     />
+                    <div className="space-y-1">
+                      <input
+                        type="number"
+                        min={1} max={10}
+                        value={priorityWeight}
+                        onChange={e => setPriorityWeight(Number(e.target.value))}
+                        className="w-20 px-3 py-2.5 bg-card border border-border rounded-xl text-center font-bold text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                        title="Weight (1–10): higher = more urgent"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-all"
+                    >
+                      <Plus className="w-4 h-4" /> Add
+                    </button>
                   </div>
-                  <button
-                    type="submit"
-                    className="px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold text-sm flex items-center gap-2 hover:opacity-90 transition-all"
-                  >
-                    <Plus className="w-4 h-4" /> Add
-                  </button>
-                </div>
-                <p className="text-xs text-muted-foreground">Weight (1–10): higher values appear first and signal greater urgency.</p>
-              </form>
+                  <p className="text-xs text-muted-foreground">Weight (1–10): higher values appear first and signal greater urgency.</p>
+                </form>
+              )}
 
               <div className="space-y-2">
                 {settings?.priorities.length === 0 && (
@@ -539,12 +687,14 @@ export default function ProjectSettingsModal({ projectId, onClose, onUpdated }: 
                       <span className="font-medium text-sm">{p.name}</span>
                       <span className="text-xs text-muted-foreground">weight {p.weight}/10</span>
                     </div>
-                    <button
-                      onClick={() => deletePriority(p.id)}
-                      className="p-1.5 hover:bg-destructive/10 hover:text-destructive rounded-lg transition-colors text-muted-foreground opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {isProjectAdmin && (
+                      <button
+                        onClick={() => deletePriority(p.id)}
+                        className="p-1.5 hover:bg-destructive/10 hover:text-destructive rounded-lg transition-colors text-muted-foreground opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -609,7 +759,7 @@ export default function ProjectSettingsModal({ projectId, onClose, onUpdated }: 
               </div>
 
               {/* Action Buttons */}
-              {status !== 'CLOSED' && (
+              {isProjectAdmin && status !== 'CLOSED' && (
                 <div className="grid grid-cols-2 gap-3">
                   {status === 'IDLE' && (
                     <button
@@ -690,6 +840,37 @@ export default function ProjectSettingsModal({ projectId, onClose, onUpdated }: 
           )}
         </div>
       </div>
+
+      {memberToRemove && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-card w-full max-w-sm rounded-3xl shadow-2xl border border-destructive/20 p-6 relative">
+            <h3 className="text-xl font-bold flex items-center gap-2 mb-2 text-destructive">
+              <AlertTriangle className="w-5 h-5" />
+              Remove Member
+            </h3>
+            <p className="text-muted-foreground text-sm mb-6">
+              Are you sure you want to remove <span className="font-bold text-foreground">{memberToRemove.user?.name || memberToRemove.user?.email}</span> from this project? They will lose access to all boards and cards within it.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setMemberToRemove(null)}
+                disabled={isRemovingMember}
+                className="flex-1 py-2.5 bg-secondary rounded-xl font-semibold hover:bg-border transition-colors text-sm disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRemoveProjectMember}
+                disabled={isRemovingMember}
+                className="flex-1 py-2.5 bg-destructive text-white rounded-xl font-bold hover:opacity-90 shadow-lg shadow-destructive/20 transition-all flex justify-center items-center gap-2 text-sm disabled:opacity-50"
+              >
+                {isRemovingMember ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Trash2 className="w-4 h-4" /> Remove</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

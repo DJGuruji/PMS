@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getUserId } from '@/lib/rbac';
+import { getUserId, isPrivileged } from '@/lib/rbac';
 import { getProjectRole, canManageProject } from '@/lib/project-rbac';
 import { serializeBigInt } from '@/lib/serializer';
 
@@ -47,9 +47,12 @@ export async function DELETE(
     const userId = getUserId(req);
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    if (!(await canManageProject(userId, projectId))) {
+    // Global ADMIN/SUB_ADMIN can delete any project.
+    // Project-level ADMIN can delete their own project.
+    const globalPrivilege = isPrivileged(req);
+    if (!globalPrivilege && !(await canManageProject(userId, projectId))) {
       return NextResponse.json(
-        { error: 'Only project admins can delete a project' },
+        { error: 'Only admins can delete a project' },
         { status: 403 }
       );
     }

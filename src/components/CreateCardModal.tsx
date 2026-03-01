@@ -17,18 +17,23 @@ export default function CreateCardModal({ projectId, columnId, onClose, onCreate
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [priorities, setPriorities] = useState<any[]>([]);
   const [labels, setLabels] = useState<any[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
   const [priorityId, setPriorityId] = useState('');
+  const [assigneeId, setAssigneeId] = useState('');
   const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
+  const [isLabelDropdownOpen, setIsLabelDropdownOpen] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [{ data: pData }, { data: lData }] = await Promise.all([
+        const [{ data: pData }, { data: lData }, { data: mData }] = await Promise.all([
           api.get(`/projects/${projectId}/priorities`),
-          api.get(`/projects/${projectId}/labels`)
+          api.get(`/projects/${projectId}/labels`),
+          api.get(`/projects/${projectId}/members`)
         ]);
         setPriorities(pData);
         setLabels(lData);
+        setMembers(mData.members || []);
       } catch (e) {
         console.error('Failed to fetch metadata', e);
       }
@@ -44,6 +49,7 @@ export default function CreateCardModal({ projectId, columnId, onClose, onCreate
         name,
         description,
         columnId,
+        assigneeId: assigneeId || undefined,
         priorityId: priorityId || undefined,
         labelIds: selectedLabels
       });
@@ -110,27 +116,69 @@ export default function CreateCardModal({ projectId, columnId, onClose, onCreate
                   ))}
                 </select>
              </div>
+             
+             <div className="space-y-2">
+                <label className="text-sm font-medium ml-1">Assignee</label>
+                <select 
+                  value={assigneeId}
+                  onChange={(e) => setAssigneeId(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-secondary border border-border rounded-xl focus:ring-2 focus:ring-primary/20 outline-none appearance-none"
+                >
+                  <option value="">Unassigned</option>
+                  {members.map(m => (
+                    <option key={m.user.id} value={m.user.id}>{m.user.name || m.user.email}</option>
+                  ))}
+                </select>
+             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 relative">
              <label className="text-sm font-medium ml-1">Labels</label>
-             <div className="flex flex-wrap gap-2">
-                {labels.map(label => (
-                  <button
-                    key={label.id}
-                    type="button"
-                    onClick={() => toggleLabel(label.id)}
-                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all border ${
-                      selectedLabels.includes(label.id) 
-                        ? 'ring-2 ring-primary ring-offset-2 ring-offset-card' 
-                        : 'opacity-60 hover:opacity-100'
-                    }`}
-                    style={{ backgroundColor: label.color, color: '#fff' }}
-                  >
-                    {label.name}
-                  </button>
-                ))}
+             <div 
+               onClick={() => setIsLabelDropdownOpen(!isLabelDropdownOpen)}
+               className="w-full px-4 py-2.5 bg-secondary border border-border rounded-xl cursor-pointer hover:border-primary/50 transition-colors flex flex-wrap gap-2 items-center min-h-[46px]"
+             >
+                {selectedLabels.length === 0 ? (
+                  <span className="text-muted-foreground text-sm">Select labels...</span>
+                ) : (
+                  labels.filter(l => selectedLabels.includes(l.id)).map(label => (
+                    <span
+                      key={label.id}
+                      className="px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm"
+                      style={{ backgroundColor: label.color, color: '#fff' }}
+                    >
+                      {label.name}
+                    </span>
+                  ))
+                )}
              </div>
+
+             {isLabelDropdownOpen && (
+               <div className="absolute top-[100%] left-0 w-full mt-2 p-3 bg-card border border-border rounded-xl shadow-xl z-50 flex flex-col gap-2 max-h-48 overflow-y-auto">
+                 {labels.length === 0 ? (
+                    <span className="text-muted-foreground text-sm p-2 text-center">No labels available in this project.</span>
+                 ) : (
+                    labels.map(label => (
+                      <button
+                        key={label.id}
+                        type="button"
+                        onClick={() => toggleLabel(label.id)}
+                        className={`flex flex-1 justify-between items-center px-3 py-2 rounded-lg text-sm font-bold transition-all border ${
+                          selectedLabels.includes(label.id) 
+                            ? 'ring-2 ring-primary ring-offset-1 ring-offset-card' 
+                            : 'opacity-80 hover:opacity-100 hover:bg-secondary'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-4 h-4 rounded-full" style={{ backgroundColor: label.color }} />
+                          {label.name}
+                        </div>
+                        {selectedLabels.includes(label.id) && <span className="text-primary text-xs">Selected</span>}
+                      </button>
+                    ))
+                 )}
+               </div>
+             )}
           </div>
 
           <div className="flex gap-3 pt-6">

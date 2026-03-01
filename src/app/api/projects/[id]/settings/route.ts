@@ -35,17 +35,6 @@ export async function PATCH(
       data: result.data,
     });
 
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        projectId,
-        action: 'UPDATE',
-        entity: 'PROJECT_SETTINGS',
-        entityId: projectId,
-        details: result.data as object,
-      },
-    });
-
     return NextResponse.json(serializeBigInt(project));
   } catch (error) {
     console.error('Update settings error:', error);
@@ -75,9 +64,7 @@ export async function GET(
         status: true,
         cardMovementMode: true,
         startedAt: true,
-        pausedAt: true,
-        closedAt: true,
-        totalPausedMs: true,
+        pauses: true,
         labels: { orderBy: { createdAt: 'asc' } },
         priorities: { orderBy: { weight: 'desc' } },
         members: {

@@ -110,41 +110,29 @@ export async function PATCH(
           data: { order: { increment: 1 } },
         });
 
-        // 3. Log the cross-column movement
-        await tx.cardMovementLog.create({
-          data: {
-            cardId,
-            fromColumnId: oldColumnId,
-            toColumnId: columnId,
-            movedById: userId,
-          },
+        // 3. Move the card
+        await tx.card.update({
+          where: { id: cardId },
+          data: { columnId, order: newOrder },
+        });
+
+        // 4. Update the timeline interval
+        await tx.cardColumnTime.updateMany({
+          where: { cardId, endedAt: null },
+          data: { endedAt: new Date() },
+        });
+        await tx.cardColumnTime.create({
+          data: { cardId, columnId },
         });
       }
 
-      // Update the card itself
-      await tx.card.update({
-        where: { id: cardId },
-        data: {
-          columnId,
-          order: newOrder,
-        },
-      });
-
-      // Log in generic audit log
-      await tx.auditLog.create({
-        data: {
-          userId,
-          projectId: existingCard.projectId,
-          action: 'MOVE',
-          entity: 'CARD',
-          entityId: cardId,
-          details: { 
-            from: oldColumnId !== columnId ? oldColumnId : 'SAME_COLUMN',
-            to: columnId,
-            order: newOrder
-          }
-        }
-      });
+      // Update the card itself (same column reorder doesn't change intervals)
+      if (oldColumnId === columnId) {
+        await tx.card.update({
+          where: { id: cardId },
+          data: { columnId, order: newOrder },
+        });
+      }
     });
 
     return NextResponse.json({ message: 'Card moved successfully' });
