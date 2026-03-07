@@ -23,8 +23,12 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    // If error is 401 and not already retried
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // List of public auth endpoints that should NOT trigger a refresh
+    const skipRefreshPaths = ['/auth/login', '/auth/register', '/auth/verify-otp', '/auth/forgot-password', '/auth/reset-password', '/auth/refresh'];
+    const isSkipPath = skipRefreshPaths.some(path => originalRequest.url?.includes(path));
+
+    // If error is 401 and not already retried and not a public auth path
+    if (error.response?.status === 401 && !originalRequest._retry && !isSkipPath) {
       originalRequest._retry = true;
       
       try {
@@ -37,7 +41,8 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         useAuthStore.getState().logout();
-        return Promise.reject(refreshError);
+        // Return a cleaner error if it's a session check
+        return Promise.reject(new Error('Session expired. Please login again.'));
       }
     }
     

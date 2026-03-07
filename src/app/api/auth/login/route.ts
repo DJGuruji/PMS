@@ -3,20 +3,30 @@ import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
 import { loginSchema } from '@/lib/validations/auth';
 import { signAccessToken, signRefreshToken } from '@/lib/auth';
+import { verifyRecaptcha } from '@/lib/recaptcha';
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const result = loginSchema.safeParse(body);
+    const { email, password, recaptchaToken } = body;
 
+    // 1. Verify reCAPTCHA
+    if (!recaptchaToken) {
+      return NextResponse.json({ error: 'reCAPTCHA token is required' }, { status: 400 });
+    }
+    const isHuman = await verifyRecaptcha(recaptchaToken);
+    if (!isHuman) {
+      return NextResponse.json({ error: 'reCAPTCHA verification failed' }, { status: 400 });
+    }
+
+    // 2. Validate Schema
+    const result = loginSchema.safeParse({ email, password });
     if (!result.success) {
       return NextResponse.json(
         { error: 'Invalid input', details: result.error.format() },
         { status: 400 }
       );
     }
-
-    const { email, password } = result.data;
 
     const user = await prisma.user.findUnique({
       where: { email },
@@ -26,6 +36,14 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
+      );
+    }
+
+    // 3. Check Email Verification
+    if (!user.isEmailVerified) {
+      return NextResponse.json(
+        { error: 'Email not verified', details: { unverified: true, email: user.email } },
+        { status: 403 }
       );
     }
 

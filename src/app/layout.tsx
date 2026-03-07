@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Script from 'next/script';
+import { Toaster } from 'react-hot-toast';
+
+const siteKey = process.env.NEXT_PUBLIC_GOOGLE_RECAPTCHE_SITEKEY;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,6 +31,19 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        {siteKey && (
+          <Script
+            src={`https://www.google.com/recaptcha/api.js?render=${siteKey}`}
+            strategy="afterInteractive"
+          />
+        )}
+        <Toaster position="top-right" toastOptions={{
+          style: {
+            background: '#1e293b',
+            color: '#fff',
+            border: '1px solid #334155',
+          }
+        }} />
         {children}
       </body>
     </html>

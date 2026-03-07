@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 import { format, formatDistanceToNow } from 'date-fns';
+import { formatDuration } from '@/lib/formatters';
 
 interface ProjectStatsModalProps {
   projectId: string;
@@ -28,7 +29,7 @@ export default function ProjectStatsModal({ projectId, onClose }: ProjectStatsMo
     const fetchStats = async () => {
       try {
         const { data } = await api.get(`/projects/${projectId}/stats`);
-        setStats(data.stats);
+        setStats(data);
       } catch (e) {
         console.error('Failed to fetch project stats', e);
       } finally {
@@ -87,86 +88,126 @@ export default function ProjectStatsModal({ projectId, onClose }: ProjectStatsMo
                     <div>
                        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Completion Status</p>
                        <h3 className="text-4xl font-black text-foreground">
-                          {Math.round(stats.completionPercentage)}%
+                          {Math.round(stats.cards.completionPercentage)}%
                        </h3>
                     </div>
                     <div className="text-right">
-                       <p className="text-sm font-bold text-primary">{stats.closedCards} / {stats.totalCards} Tasks</p>
+                       <p className="text-sm font-bold text-primary">{stats.cards.closedCards} / {stats.cards.totalCards} Tasks</p>
                     </div>
                  </div>
-                 <div className="w-full h-4 bg-background/50 rounded-full border border-border p-1">
+                  <div className="w-full h-4 bg-background/50 rounded-full border border-border p-1">
                     <div 
                       className="h-full bg-gradient-to-r from-primary to-blue-500 rounded-full transition-all duration-1000 shadow-lg shadow-primary/20"
-                      style={{ width: `${stats.completionPercentage}%` }}
+                      style={{ width: `${stats.cards.completionPercentage}%` }}
                     />
-                 </div>
-              </div>
-              <Activity className="absolute -right-8 -bottom-8 w-40 h-40 text-primary/5 -rotate-12" />
-           </div>
+                  </div>
+               </div>
+               <Activity className="absolute -right-8 -bottom-8 w-40 h-40 text-primary/5 -rotate-12" />
+            </div>
+
+            {/* Time Stats Summary */}
+            <div className="grid grid-cols-3 gap-4">
+               <div className="bg-secondary/10 p-5 rounded-2xl border border-border/50 text-center">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Active Time</p>
+                  <p className="text-xl font-black text-primary font-mono">{formatDuration(stats.durations.activeSeconds)}</p>
+               </div>
+               <div className="bg-secondary/10 p-5 rounded-2xl border border-border/50 text-center">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Paused Time</p>
+                  <p className="text-xl font-black text-destructive font-mono">{formatDuration(stats.durations.pausedSeconds)}</p>
+               </div>
+               <div className="bg-secondary/10 p-5 rounded-2xl border border-border/50 text-center">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Lead Time</p>
+                  <p className="text-xl font-black text-foreground font-mono">{formatDuration(stats.durations.totalSeconds)}</p>
+               </div>
+            </div>
 
            {/* Stats Grid */}
-           <div className="grid grid-cols-2 gap-4">
-              <div className="bg-card p-6 rounded-2xl border border-border shadow-sm flex items-start gap-4">
-                 <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-500 shrink-0">
-                    <CheckCircle2 className="w-5 h-5" />
-                 </div>
-                 <div>
-                    <p className="text-xs font-bold text-muted-foreground uppercase mb-1">Delivered Tasks</p>
-                    <p className="text-xl font-bold">{stats.closedCards}</p>
-                 </div>
-              </div>
-              <div className="bg-card p-6 rounded-2xl border border-border shadow-sm flex items-start gap-4">
-                 <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-500 shrink-0">
-                    <Layers className="w-5 h-5" />
-                 </div>
-                 <div>
-                    <p className="text-xs font-bold text-muted-foreground uppercase mb-1">Active Backlog</p>
-                    <p className="text-xl font-bold">{stats.openCards}</p>
-                 </div>
-              </div>
-           </div>
+            <div className="grid grid-cols-2 gap-4">
+               <div className="bg-card p-6 rounded-2xl border border-border shadow-sm flex items-start gap-4">
+                  <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-500 shrink-0">
+                     <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                     <p className="text-xs font-bold text-muted-foreground uppercase mb-1">Delivered Tasks</p>
+                     <p className="text-xl font-bold">{stats.cards.closedCards}</p>
+                  </div>
+               </div>
+               <div className="bg-card p-6 rounded-2xl border border-border shadow-sm flex items-start gap-4">
+                  <div className="w-10 h-10 bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-500 shrink-0">
+                     <Layers className="w-5 h-5" />
+                  </div>
+                  <div>
+                     <p className="text-xs font-bold text-muted-foreground uppercase mb-1">Active Backlog</p>
+                     <p className="text-xl font-bold">{stats.cards.openCards}</p>
+                  </div>
+               </div>
+            </div>
 
            {/* Timeline Section */}
-           <div className="space-y-4">
-              <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                 <Calendar className="w-4 h-4" /> Project Timeline
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <div className="p-5 bg-secondary/20 rounded-2xl border border-border/40 flex items-center gap-4">
-                    <div className="p-3 bg-secondary rounded-xl text-muted-foreground">
-                       <Clock className="w-5 h-5" />
-                    </div>
-                    <div>
-                       <p className="text-[10px] font-bold text-muted-foreground uppercase">Project Started</p>
-                       <p className="text-sm font-bold">{format(new Date(stats.startTime), 'MMM d, yyyy')}</p>
-                       <p className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(stats.startTime))} ago</p>
-                    </div>
-                 </div>
-                 
-                 {stats.isCompleted ? (
-                    <div className="p-5 bg-emerald-500/5 rounded-2xl border border-emerald-500/20 flex items-center gap-4">
-                       <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500">
-                          <Trophy className="w-5 h-5" />
-                       </div>
-                       <div>
-                          <p className="text-[10px] font-bold text-emerald-500 uppercase">Project Finished</p>
-                          <p className="text-sm font-bold">{format(new Date(stats.endTime), 'MMM d, yyyy')}</p>
-                       </div>
-                    </div>
-                 ) : (
-                    <div className="p-5 bg-primary/5 rounded-2xl border border-primary/20 flex items-center gap-4">
-                       <div className="p-3 bg-primary/10 rounded-xl text-primary animate-pulse">
-                          <Activity className="w-5 h-5" />
-                       </div>
-                       <div>
-                          <p className="text-[10px] font-bold text-primary uppercase">Current Velocity</p>
-                          <p className="text-sm font-bold">Ongoing Execution</p>
-                          <p className="text-[10px] text-muted-foreground font-medium">Estimated track: Active</p>
-                       </div>
-                    </div>
-                 )}
-              </div>
-           </div>
+            <div className="space-y-4">
+               <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                  <Calendar className="w-4 h-4" /> Project Timeline
+               </h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-5 bg-secondary/20 rounded-2xl border border-border/40 flex items-center gap-4">
+                     <div className="p-3 bg-secondary rounded-xl text-muted-foreground">
+                        <Clock className="w-5 h-5" />
+                     </div>
+                     <div>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Project Started</p>
+                        <p className="text-sm font-bold">{stats.startTime ? format(new Date(stats.startTime), 'MMM d, yyyy') : 'N/A'}</p>
+                        {stats.startTime && <p className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(stats.startTime))} ago</p>}
+                     </div>
+                  </div>
+                  
+                  {stats.isCompleted ? (
+                     <div className="p-5 bg-emerald-500/5 rounded-2xl border border-emerald-500/20 flex items-center gap-4">
+                        <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-500">
+                           <Trophy className="w-5 h-5" />
+                        </div>
+                        <div>
+                           <p className="text-[10px] font-bold text-emerald-500 uppercase">Project Finished</p>
+                           <p className="text-sm font-bold">{stats.endTime ? format(new Date(stats.endTime), 'MMM d, yyyy') : 'N/A'}</p>
+                        </div>
+                     </div>
+                  ) : (
+                     <div className="p-5 bg-primary/5 rounded-2xl border border-primary/20 flex items-center gap-4">
+                        <div className="p-3 bg-primary/10 rounded-xl text-primary animate-pulse">
+                           <Activity className="w-5 h-5" />
+                        </div>
+                        <div>
+                           <p className="text-[10px] font-bold text-primary uppercase">Current Velocity</p>
+                           <p className="text-sm font-bold">Ongoing Execution</p>
+                           <p className="text-[10px] text-muted-foreground font-medium">Tracking {stats.status}</p>
+                        </div>
+                     </div>
+                  )}
+               </div>
+            </div>
+
+            {/* Column Distribution Section */}
+            <div className="space-y-4">
+               <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                  <Layers className="w-4 h-4" /> Column Performance
+               </h3>
+               <div className="space-y-3">
+                  {stats.columns.map((col: any) => (
+                     <div key={col.id} className="bg-card p-4 rounded-2xl border border-border shadow-sm flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                           <div className="w-2 h-10 bg-secondary rounded-full" />
+                           <div>
+                              <p className="font-bold">{col.name}</p>
+                              <p className="text-xs text-muted-foreground">{col.cardCount} tasks processed</p>
+                           </div>
+                        </div>
+                        <div className="text-right">
+                           <p className="text-xs font-bold text-muted-foreground uppercase">Avg. Time</p>
+                           <p className="font-mono font-bold text-primary">{formatDuration(col.averageTimeSeconds)}</p>
+                        </div>
+                     </div>
+                  ))}
+               </div>
+            </div>
         </div>
 
         <footer className="px-8 py-4 bg-secondary/30 border-t border-border flex justify-end">
