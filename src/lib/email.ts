@@ -120,3 +120,64 @@ export async function sendOrgRemovedEmail({
 </body>`,
   });
 }
+
+export async function sendOtpEmail({
+  toEmail,
+  otp,
+}: {
+  toEmail: string;
+  otp: string;
+}) {
+  const html = `
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',sans-serif;">
+  <div style="max-width:400px;margin:40px auto;background:#1e293b;border-radius:24px;padding:40px;border:1px solid #334155;text-align:center;">
+    <h1 style="color:#fff;font-size:24px;margin-bottom:8px;">Verify your email</h1>
+    <p style="color:#94a3b8;font-size:14px;margin-bottom:32px;">Use the code below to complete your registration.</p>
+    <div style="background:#0f172a;padding:20px;border-radius:16px;border:1px solid #334155;margin-bottom:32px;">
+      <span style="font-size:32px;font-weight:800;letter-spacing:8px;color:#6366f1;font-family:monospace;">${otp}</span>
+    </div>
+    <p style="color:#475569;font-size:12px;">This code will expire in 10 minutes.</p>
+  </div>
+</body>
+</html>`;
+
+  await transporter.sendMail({
+    from: `"PMS Security" <${process.env.SMTP_USER}>`,
+    to: toEmail,
+    subject: `Verify your email - ${otp}`,
+    html,
+  });
+}
+
+export async function sendPasswordResetEmail({
+  toEmail,
+  token,
+  appUrl,
+}: {
+  toEmail: string;
+  token: string;
+  appUrl: string;
+}) {
+  const resetUrl = `${appUrl}/auth/reset-password?token=${token}`;
+  const html = `
+<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',sans-serif;">
+  <div style="max-width:400px;margin:40px auto;background:#1e293b;border-radius:24px;padding:40px;border:1px solid #334155;text-align:center;">
+    <h1 style="color:#fff;font-size:24px;margin-bottom:8px;">Reset your password</h1>
+    <p style="color:#94a3b8;font-size:14px;margin-bottom:32px;">Click the button below to set a new password for your account.</p>
+    <a href="${resetUrl}" style="display:inline-block;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;text-decoration:none;padding:14px 36px;border-radius:12px;font-weight:700;font-size:15px;">Reset Password</a>
+    <p style="color:#475569;font-size:12px;margin-top:32px;">This link will expire in 1 hour.</p>
+  </div>
+</body>
+</html>`;
+
+  await transporter.sendMail({
+    from: `"PMS Security" <${process.env.SMTP_USER}>`,
+    to: toEmail,
+    subject: "Reset your password",
+    html,
+  });
+}

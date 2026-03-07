@@ -36,6 +36,16 @@ model User {
   password  String
   name      String?
   role      Role     @default(MEMBER)
+  
+  // Email Verification
+  isEmailVerified  Boolean   @default(false)
+  emailOtp         String?
+  emailOtpExpires  DateTime?
+  
+  // Password Reset
+  resetToken        String?   @unique
+  resetTokenExpires DateTime?
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

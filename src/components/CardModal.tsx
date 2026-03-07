@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 import { format, formatDistanceToNow } from 'date-fns';
+import { formatDuration } from '@/lib/formatters';
 
 interface TimelineStep {
   columnId: string;
@@ -382,9 +383,9 @@ export default function CardModal({ cardId, onClose, onDeleted }: CardModalProps
               <div className="grid grid-cols-2 gap-4 pt-6">
                  <div className="bg-secondary/50 p-6 rounded-2xl border border-border/50">
                     <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Total Active Time</p>
-                    <p className="text-2xl font-black text-primary font-mono">
-                       {Math.floor((timeline?.totalTimeSeconds || 0) / 3600)}h {Math.floor(((timeline?.totalTimeSeconds || 0) % 3600) / 60)}m
-                    </p>
+                     <p className="text-2xl font-black text-primary font-mono">
+                        {formatDuration(timeline?.totalTimeSeconds || 0)}
+                     </p>
                  </div>
                  <div className="bg-secondary/50 p-6 rounded-2xl border border-border/50">
                     <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Current Status</p>
@@ -415,9 +416,9 @@ export default function CardModal({ cardId, onClose, onDeleted }: CardModalProps
                          <div className="flex-1 bg-secondary/30 rounded-2xl p-5 border border-border/50 group-hover:border-primary/20 transition-all">
                             <div className="flex justify-between items-start mb-1">
                                <h4 className="font-bold text-lg">{step.columnName}</h4>
-                               <span className="text-xs font-mono font-bold bg-secondary px-2 py-1 rounded-md text-muted-foreground">
-                                  {Math.floor(step.durationSeconds / 60)} min
-                               </span>
+                                <span className="text-xs font-mono font-bold bg-secondary px-2 py-1 rounded-md text-muted-foreground text-nowrap">
+                                   {formatDuration(step.durationSeconds)}
+                                </span>
                             </div>
                             <div className="text-xs text-muted-foreground flex items-center gap-4">
                                <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> Entered {format(new Date(step.enteredAt), 'MMM d, HH:mm')}</span>

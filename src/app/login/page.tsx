@@ -6,14 +6,17 @@ import Link from 'next/link';
 import { Layout, Mail, Lock, Loader2, ArrowRight } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
+import toast from 'react-hot-toast';
+
+import { useRecaptcha } from '@/hooks/useRecaptcha';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const router = useRouter();
   const setAuth = useAuthStore((state) => state.setAuth);
+  const { executeRecaptcha } = useRecaptcha();
 
   useEffect(() => {
     const checkUser = async () => {
@@ -34,15 +37,27 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!executeRecaptcha) {
+      toast.error('reCAPTCHA not initialized');
+      return;
+    }
+
     setIsLoading(true);
-    setError('');
 
     try {
-      const { data } = await api.post('/auth/login', { email, password });
+      const recaptchaToken = await executeRecaptcha('login');
+      const { data } = await api.post('/auth/login', { email, password, recaptchaToken });
       setAuth(data.user, data.accessToken);
+      toast.success('Login successful');
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Invalid credentials');
+      const apiError = err.response?.data?.error || 'Invalid credentials';
+      if (err.response?.data?.details?.unverified) {
+        toast.error('Email not verified. Please check your inbox.');
+        router.push(`/auth/verify-otp?email=${encodeURIComponent(err.response.data.details.email)}`);
+        return;
+      }
+      toast.error(apiError);
     } finally {
       setIsLoading(false);
     }
@@ -65,11 +80,6 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <div className="bg-destructive/10 border border-destructive/20 text-destructive text-sm p-3 rounded-lg animate-in fade-in slide-in-from-top-1">
-              {error}
-            </div>
-          )}
 
           <div className="space-y-4">
             <div className="space-y-2">
@@ -90,6 +100,9 @@ export default function LoginPage() {
             <div className="space-y-2">
               <div className="flex justify-between items-center ml-1">
                 <label className="text-sm font-medium">Password</label>
+                <Link href="/auth/forgot-password" title="Click here to reset your password" className="text-xs text-primary hover:underline underline-offset-4 font-medium">
+                  Forgot password?
+                </Link>
               </div>
               <div className="relative group">
                 <Lock className="absolute left-3 top-3 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />

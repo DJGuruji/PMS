@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 import { format, formatDistanceToNow } from 'date-fns';
+import { formatDuration } from '@/lib/formatters';
 import Link from 'next/link';
 import CardModal from '@/components/CardModal';
 import CreateCardModal from '@/components/CreateCardModal';
@@ -348,7 +349,7 @@ export default function KanbanBoard() {
                                   {card.holds?.some(h => !h.endedAt) ? (
                                     <div className="flex items-center gap-2">
                                       <span className="text-[10px] font-medium text-destructive">
-                                        Paused {formatDistanceToNow(new Date(card.holds.find(h => !h.endedAt)!.startedAt))}
+                                        Paused {formatDuration(Math.floor((new Date().getTime() - new Date(card.holds.find(h => !h.endedAt)!.startedAt).getTime()) / 1000))} ago
                                       </span>
                                       <button 
                                         onClick={(e) => toggleHold(e, card)}

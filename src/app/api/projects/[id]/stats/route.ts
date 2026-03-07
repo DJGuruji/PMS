@@ -73,8 +73,8 @@ export async function GET(
         id: col.id,
         name: col.name,
         cardCount: cardsInCol,
-        averageTimeMinutes: cardTimesInCol.length > 0 ? Math.floor((totalMsInCol / cardTimesInCol.length) / 60000) : 0,
-        totalTimeMinutes: Math.floor(totalMsInCol / 60000)
+        averageTimeSeconds: cardTimesInCol.length > 0 ? Math.floor((totalMsInCol / cardTimesInCol.length) / 1000) : 0,
+        totalTimeSeconds: Math.floor(totalMsInCol / 1000)
       };
     });
 
